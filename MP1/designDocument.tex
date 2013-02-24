@@ -14,6 +14,59 @@
 
 \end{abstract}
 
-\section{Section}
+\section{Introduction}
+\section{Methods}
+\subsection{Proof of Causal Ordering}
+
+\subsection{Proof of Reliable Multicast}
+The reliable multicast algorithm utilized in this implementation is described below:
+
+\begin{algorithm}[t]
+\SetAlgoNoLine
+\KwIn{Multicast group $g$, message $m$, sequence number $s$, acknowledgment set $A$, indexed by $p \in g$.}
+\KwOut{New sequence number $s$ + 1.}
+\For{each $p \in g$}{
+	$m'$ = piggyback($s$,$A$,$m$)\;
+	unicast($p$,$m'$)\;
+}
+\caption{Reliable multicast send}
+\label{alg:one}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\SetAlgoNoLine
+\KwIn{Source $p_s$, message $m'$, Hold-back queue $Q$.}
+\KwOut{No output. Updates hold-back queue $Q$.}
+\{$s$, $A$, $m$\} = unpiggyback($m'$)\;
+\uIf{$s$ == $Q[p_s] + 1$}{
+   deliver($m$)\;
+}
+\uElseIf{$s \leq Q[p_s]$}{
+   discard($m$)\;
+}
+\uElseIf{$s > Q[p_s] + 1$}{
+	holdback($m$,$Q$)\;
+}
+\uElseIf{$\exists\; p \in A$ such that $A[p] > Q[p]$}{
+	negativeAcknowledge($m$)\;
+}
+\Else{
+}
+\caption{Reliable multicast receive}
+\label{alg:two}
+\end{algorithm}
+
+Here, we prove the properties of reliable multicast. For correct processes:
+\begin{enumerate}
+\item Integrity: Each message delivered at most once. The process is a member of the message's multicast group, and the message was sent by it's claimed sender. 
+\item Validity: Eventual delivery of all sent messages to own process.
+\item Agreement: If a message is delivered to one process, it is delivered to all.
+\end{enumerate}
+
+
+\subsubsection{Integrity}
+
+\subsection{Proof of Failure Detection}
+\section{Conclusion}
 
 \end{document}

@@ -1,5 +1,6 @@
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "mp1.h"
 
@@ -24,5 +25,5 @@ void receive(int source, const char *message, int len) {
 }
 
 void mcast_join(int member) {
-
+   printf("%d friggin joined.", member);
 }

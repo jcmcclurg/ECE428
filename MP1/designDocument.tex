@@ -1,7 +1,10 @@
 \documentclass[]{article}
 \usepackage{amsmath}
 \usepackage{cancel}
-\usepackage{algorithm2e}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subfig}
+
 %opening
 \title{ECE 428 MP1 Design Documentation}
 \author{Josiah McClurg and Yihua Lou}
@@ -9,7 +12,6 @@
 
 
 \begin{document}
-\SetAlgoNoLine
 \maketitle
 
 \begin{abstract}
@@ -18,13 +20,15 @@
 
 \section{Introduction}
 \section{Methods}
+For by Algorithms~\ref{alg:send}, \ref{alg:rcv}, and \ref{alg:failure}, define the following variables: Multicast group $G^k$, own process identifier $p_{self}$, raw message $m$, sequence number $s$, message source $p_s$, message with meta information $m'$, along with current vector timestamp $T^k$, and delivery acknowledgment set $D^{k\times k}$, delivered message store $S^{k\times w}$, holdback queue $Q^{k \times z}$, last delivery vector timestamp $T_l^k$, and timeout list $L^k$ all indexed by $p \in G$.
+ 
 \subsection{Proof of Causal Ordering}
 Prove: If $multicastSend(m)$ happens-before $multicastSend(m')$, and $m'$ delivered by correct process $p$, then for process $p$, $deliver(m)$ happens-before $deliver(m')$.
 
 For vector timestamps $T_1$ and $T_2$, it can be proved that $T_1 < T_2 \Rightarrow T_1$ happens-before $T_2$. By this reasoning, Algorithm~\ref{alg:rcv} ensures that the most recently delivered message was either sent before or was sent concurrently with each new message that is delivered.
 
 \subsection{Proof of Reliable Multicast}
-Prove the Integrity, Validity and Agreement properties of the reliable multicast algorithms described by Algorithms~\ref{alg:send}, \ref{alg:rcv}, and \ref{alg:failure}.
+Prove the Integrity, Validity and Agreement properties of the reliable multicast algorithms.
 
 \subsubsection{Integrity}
 Prove: (a) Each message delivered at most once. (b) The process is a member of the message's multicast group, and (c) the message was sent by it's claimed sender.
@@ -33,7 +37,7 @@ Prove: (a) Each message delivered at most once. (b) The process is a member of t
 
 (b) is deferred to the underlying process communication protocol.
 
-(c) is ensured by allowing retransmissions from other processes to masquerade as the original sender.
+(c) is ensured by allowing processes other than the original sender to retransmit any delivered message (in case the original sender has failed).
 \subsubsection{Validity}
 Prove: Eventual delivery of all sent messages to own process.
 
@@ -52,122 +56,152 @@ Prove: Every failure is eventually detected.
 
 Given that process $p$ has failed, it will not send out heartbeats. Algorithm~\ref{alg:failure} guarantees that each process will detect this within a finite time. Because delays can be unbounded, there is no guarantee against false positives in the failure detection.
 
-\begin{algorithm}[t]
-\KwIn{Multicast group $G$, own process identifier $p_{self}$, message $m$, sequence number $s$, along with vector timestamp $T$, and delivery acknowledgment set $D$ all indexed by $p \in G$.}
-\KwOut{Updates $s$, and $S$.}
-\For{each $p \neq p_{self} \in G$}{
-	incrementTimestamp($p_{self}$,$T$)\;
-	$m'$ = piggyback($T$, $s$, $D[p_{self}]$, $p$, $m$)\;
-	unicast($p$,$m'$)\;
-}
-incrementSequenceNumber($s$)\;
-\caption{Reliable multicast send}
-\label{alg:send}
+
+\begin{algorithm}
+\caption{Failure detect thread.}
+\label{alg:failure}
+\begin{algorithmic}[1]
+\Procedure{failureDetectThread}{$G$, $p_{self}$, $Q$, $T$, $T_l$, $D$, $L$}
+\State
+\Repeat
+	\For{$p \neq p_{self} \in G$}
+		\If{$\text{time}() - L[p] \geq T_f$}
+			\Comment Declare process as failed.
+			\State removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)
+		\ElsIf{$\text{time}() - L[p_{self}] \geq T_h$}
+			\Comment Send heartbeat if needed.
+			\State $m'$ = piggyback($T$, 0, $D[p_{self}]$, $p$, $\heartsuit$)
+			\State unicast($p$,$m'$)
+		\EndIf
+	\EndFor
+	\State $t$ = $T_h - (\text{time}() - L[p_{self}])$
+	\State sleep(min($t$,0))
+\Until{end of program.}
+\EndProcedure
+ \Comment Updates $G$,$Q$,$T$,$T_l$, and $D$
+\end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
-\KwIn{$G$,$D$,$T$, $p_{self}$, message source $p_s$, message $m'$, along with delivered message store $S$, holdback queue $Q$, last delivery timestamp $T_l$, and timeout list $L$ all indexed by $p \in G$.}
-\KwOut{Updates $G$,$Q$,$T$,$T_l$, and $D$.}
-% Get the meta information from the message
-\{$T_m$, $s$, $D[p_s]$, $p_{from}$, $m$\} = unpiggyback($m'$);
-% Update the timestamp and timeout list.
-mergeTimestamps($T$,$T_m$); $L[p_s]$ = time()\;
 
-% Remove p from the group if someone else has removed it.
-\For{each $p \in D[p_s]$ such that $p \not\in D$}{
-	removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)\;
-}
 
-% If everybody has delivered the message, we don't have to keep it around anymore.
-\For{each $l \in S[p] \forall p \in G$ such that $l.s \leq \text{min}(D[p])$}{
-	removeFromMsgStore($l$,$S$)\;
-}
-\uIf{$m == \Xi$}{
-	% Someone has requested a re-transmission.
-	discard($m$)\;
-	
-	\For{each $l \in S[p_{from}]$ such that $l.s \leq s$}{
-		$m'$ = piggyback($T$, $l.s$, $D$, $p_{from}$, $l.m$)\;
-		unicast($p_s$,$m'$)\;
-	}
-}
-\uElseIf{$m == \heartsuit$}{
-	% This is just a heartbeat
-	discard($m$)\;
-}
-\Else{
-	% In case we have asked a retransmission to masquerade as someone else.
-	$p_s$ = $p_{from}$\;
-	\uIf{$s$ == $D[p_s] + 1$}{
-		incrementTimestamp($p_{self}$,$T$)\;
-		
-		\uIf{$T_l \not> q.T$}{
-			% This is the message we're expecting, and it does not violate causal
-			% ordering. Go ahead and deliver it.
-			deliver($m$); $T_l$ = $T_m$; $D[p_s]$ = $s$\;
+\begin{algorithm}
+\caption{Reliable multicast send.}
+\label{alg:send}
+\begin{algorithmic}[1]
+\Procedure{multicastSend}{$G$, $p_{self}$, $m$, $s$, $T$, $D$}
 
-			$l.m$ = $m$; $l.s$ = $s$; addToMsgStore($l$,$S[p_s]$)\;
-		}
-		\Else{
-			% We were expecting this message, but if we were to deliver it
-			% now, causal ordering would be violated. Hold onto it for later.
-			$q.m$ = $m$; $q.s$ = $s$; $q.T$ = $T_m$; \;
-			addToQ($q$,$Q[p_s]$)\;
-		}
-		
-		% Deliver any messages in the queue if you can.
-		\Repeat{$Q$ unchanged.}{
-			\For{each $q \in Q[p] \forall p \in G$ such that $q.s$ == $D[p_s] + 1$ AND $T_l \not> q.T$}{
-				deliver($q.m$); removeFromQ($Q$,$q$); $T_l$ = $q.T$; $D[p_s]$ = $q.s$\;
-				
-				$l.m$ = $q.m$; $l.s$ = $s$; addToMsgStore($l$,$S[p]$)\;
-			}
-		}
-	}
-	\uElseIf{$s > D[p_s] + 1$}{
-		incrementTimestamp($p_{self}$,$T$)\;
-		% This message arrived before we expected.
-		% Hold onto it for later.
-		$q.m$ = $m$; $q.s$ = $s$; $q.T$ = $T_m$; addToQ($q$,$Q[p_s]$)\;
-	}
-	\Else{
-		% We've already delivered it.
-		% $s \leq D[p_s]$
-		discard($m$)\;
-	}
-}
-
-\For{each $p \neq p' \in G$ such that $D[p_{self}][p] < D[p'][p]$ AND $D[p'][p] \neq q.s \forall q \in Q[p_s]$}{
-		% p' has delivered a message from p that we haven't received.
-		% Ask p' to re-transmit that message to us, masquerading as p.
-		$m'$ = piggyback($T$, $D[p'][p]$, $D[p_{self}]$, $p$, $\Xi$); unicast($p_s$,$m'$)\;
-}
-\caption{Reliable multicast receive}
-\label{alg:rcv}
+\For{$p \neq p_{self} \in G$}
+	\State incrementTimestamp($p_{self}$,$T$)
+	\State $m'$ = piggyback($T$, $s$, $D[p_{self}]$, $p$, $m$)
+	\State unicast($p$,$m'$)
+\EndFor
+\State incrementSequenceNumber($s$)
+\EndProcedure
+\Comment Updates $s$, and $S$.
+\end{algorithmic}
 \end{algorithm}
 
 \begin{algorithm}
-\KwIn{$G$, $p_{self}$, $Q$, $T$, $T_l$, $D$, and $L$.}
-\KwOut{Updates $G$,$Q$,$T$,$T_l$, and $D$.}
-\Repeat{end of program}{
-	\For{each $p \neq p_{self} \in G$}{
-		\eIf{$\text{time}() - L[p] \geq T_f$}{
-			% Declare a process as failed if haven't heard from it in
-			% a long time.
-			removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)\;
-		}{
-			% Send a heartbeat if we need it
-			\If{$\text{time}() - L[p_{self}] \geq T_h$}{
-				$m'$ = piggyback($T$, 0, $D[p_{self}]$, $p$, $\heartsuit$)\;
-				unicast($p$,$m'$)\;
-			}
-		}
-	}
-	$t$ = $T_h - (\text{time}() - L[p_{self}])$\;
-	sleep(min($t$,0))\;
-}
-\caption{Failure detect thread.}
-\label{alg:failure}
+\caption{Reliable multicast receive}
+\label{alg:rcv}
+\begin{algorithmic}[1]
+\Procedure{multicastRcv}{$G$,$D$,$T$, $p_{self}$, $p_s$, $m'$, $S$, $Q$, $T_l$, $L$}
+% Get the meta information from the message
+\State \{$T_m$, $s$, $D[p_s]$, $p_{from}$, $m$\} = unpiggyback($m'$);
+
+\State mergeTimestamps($T$,$T_m$) \Comment Ensure consistency of timestamps.
+\State $L[p_s]$ = time() \Comment Reset timeout counter for $p_s$.
+
+\State \Comment Ensure consistency of group membership.
+\For{$p \in D[p_s]$ s.t. $p \not\in D$}
+	\State removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)
+\EndFor
+
+\State \Comment Delete messages known to be delivered to everyone.
+\For{$l \in S[p] \forall p \in G$ s.t. $l.s \leq \text{min}(D[p])$}
+	\State removeFromMsgStore($l$,$S$)
+\EndFor
+
+\If{$m == \Xi$}
+	\Comment This is a retransmission request message.
+	\State discard($m$)
+	
+	\For{$l \in S[p_{from}]$ s.t. $l.s \leq s$}
+		\State $m'$ = piggyback($T$, $l.s$, $D$, $p_{from}$, $l.m$)
+		\State unicast($p_s$,$m'$)
+	\EndFor
+\ElsIf{$m == \heartsuit$}
+	\Comment This is a heartbeat message.
+	\State discard($m$)
+\Else
+	\Comment This is a regular message.
+	\State $p_s$ = $p_{from}$ \Comment Rewrite $p_s$ in case of retransmission.
+	\If{$s$ == $D[p_s] + 1$}
+		\State incrementTimestamp($p_{self}$,$T$)
+		
+		\If{$T_l \not> q.T$}
+			\Comment Ensure causality of new message delivery.
+			\State deliver($m$)
+			\State $T_l$ = $T_m$
+			\State $D[p_s]$ = $s$
+			\State $l.m$ = $m$
+			\State $l.s$ = $s$
+			\State addToMsgStore($l$,$S[p_s]$)
+		\Else
+			\State $q.m$ = $m$
+			\State $q.s$ = $s$
+			\State $q.T$ = $T_m$
+			\State addToQ($q$,$Q[p_s]$)
+		\EndIf
+		\algstore{myalg}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\ContinuedFloat
+\caption{Reliable multicast receive (continued)}
+\begin{algorithmic}
+		\algrestore{myalg}
+		\Repeat
+			\Comment Attempt to deliver items in queue.
+			\For{$q \in Q[p] \forall p \in G$ s.t. $q.s$ == $D[p_s] + 1$ and $T_l \not> q.T$}
+				\State deliver($q.m$)
+				\State $T_l$ = $q.T$
+				\State $D[p_s]$ = $q.s$
+				\State removeFromQ($Q$,$q$)
+				\State $l.m$ = $q.m$
+				\State $l.s$ = $s$
+				\State addToMsgStore($l$,$S[p]$)
+			\EndFor
+		\Until{$Q$ unchanged.}
+		
+	\ElsIf{$s > D[p_s] + 1$}
+		\Comment Message arrived out of order.
+		\State incrementTimestamp($p_{self}$,$T$)
+		\State $q.m$ = $m$
+		\State $q.s$ = $s$
+		\State $q.T$ = $T_m$
+		\State addToQ($q$,$Q[p_s]$)
+	\Else
+		\Comment Message already delivered.
+		\State discard($m$)
+	\EndIf
+\EndIf
+
+\State \Comment Ask someone to re-transmit the messages that we don't have.
+\For{$s' > D[p_{self}][p] \neq q.s \forall q \in Q[p], p \in G$}
+		\If{$\exists s'' \geq s' \in D[p']$ for some $p_{self} \in G$}
+			\State $m'$ = piggyback($T$, $s''$, $D[p_{self}]$, $p$, $\Xi$);
+			\State unicast($p_s$,$m'$)
+			\Comment Ask $p'$ to send us the message it got from $p$.
+		\EndIf
+\EndFor
+\If{unable to find anyone from which to request missing messages}
+	\State die()
+\EndIf
+\EndProcedure
+\Comment Updates $G$,$Q$,$T$,$T_l$, and $D$.
+\end{algorithmic}
 \end{algorithm}
 
 \section{Conclusion}

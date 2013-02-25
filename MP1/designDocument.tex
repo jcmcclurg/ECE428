@@ -6,8 +6,10 @@
 \title{ECE 428 MP1 Design Documentation}
 \author{Josiah McClurg and Yihua Lou}
 
-\begin{document}
 
+
+\begin{document}
+\SetAlgoNoLine
 \maketitle
 
 \begin{abstract}
@@ -17,56 +19,157 @@
 \section{Introduction}
 \section{Methods}
 \subsection{Proof of Causal Ordering}
+Prove: If $multicastSend(m)$ happens-before $multicastSend(m')$, and $m'$ delivered by correct process $p$, then for process $p$, $deliver(m)$ happens-before $deliver(m')$.
+
+For vector timestamps $T_1$ and $T_2$, it can be proved that $T_1 < T_2 \Rightarrow T_1$ happens-before $T_2$. By this reasoning, Algorithm~\ref{alg:rcv} ensures that the most recently delivered message was either sent before or was sent concurrently with each new message that is delivered.
 
 \subsection{Proof of Reliable Multicast}
-The reliable multicast algorithm utilized in this implementation is described below:
-
-\begin{algorithm}[t]
-\SetAlgoNoLine
-\KwIn{Multicast group $g$, message $m$, sequence number $s$, acknowledgment set $A$, indexed by $p \in g$.}
-\KwOut{New sequence number $s$ + 1.}
-\For{each $p \in g$}{
-	$m'$ = piggyback($s$,$A$,$m$)\;
-	unicast($p$,$m'$)\;
-}
-\caption{Reliable multicast send}
-\label{alg:one}
-\end{algorithm}
-
-\begin{algorithm}[t]
-\SetAlgoNoLine
-\KwIn{Source $p_s$, message $m'$, Hold-back queue $Q$.}
-\KwOut{No output. Updates hold-back queue $Q$.}
-\{$s$, $A$, $m$\} = unpiggyback($m'$)\;
-\uIf{$s$ == $Q[p_s] + 1$}{
-   deliver($m$)\;
-}
-\uElseIf{$s \leq Q[p_s]$}{
-   discard($m$)\;
-}
-\uElseIf{$s > Q[p_s] + 1$}{
-	holdback($m$,$Q$)\;
-}
-\uElseIf{$\exists\; p \in A$ such that $A[p] > Q[p]$}{
-	negativeAcknowledge($m$)\;
-}
-\Else{
-}
-\caption{Reliable multicast receive}
-\label{alg:two}
-\end{algorithm}
-
-Here, we prove the properties of reliable multicast. For correct processes:
-\begin{enumerate}
-\item Integrity: Each message delivered at most once. The process is a member of the message's multicast group, and the message was sent by it's claimed sender. 
-\item Validity: Eventual delivery of all sent messages to own process.
-\item Agreement: If a message is delivered to one process, it is delivered to all.
-\end{enumerate}
-
+Prove the Integrity, Validity and Agreement properties of the reliable multicast algorithms described by Algorithms~\ref{alg:send}, \ref{alg:rcv}, and \ref{alg:failure}.
 
 \subsubsection{Integrity}
+Prove: (a) Each message delivered at most once. (b) The process is a member of the message's multicast group, and (c) the message was sent by it's claimed sender.
+
+(a) is easily proved by contradiction. Given that a message has been delivered once, assume that the same message is delivered a second time. Algorithm~\ref{alg:send} guarantees that the sequence numbers of both messages are the same. This implies that the acknowledgment list $D$ was not updated after the initial delivery, which is contradicted by Algorithm~\ref{alg:rcv}.
+
+(b) is deferred to the underlying process communication protocol.
+
+(c) is ensured by allowing retransmissions from other processes to masquerade as the original sender.
+\subsubsection{Validity}
+Prove: Eventual delivery of all sent messages to own process.
+
+Deferred to underlying process communication protocol.
+
+\subsubsection{Agreement}
+Prove: If a message is delivered to one process, it is delivered to all.
+
+If a message is delivered to a process, Algorithm~\ref{alg:failure} guarantees that all correct processes are aware of this delivery within some finite time. Thus, all correct processes can eventually detect any missing messages.
+
+Now, Algorithm~\ref{alg:rcv} requests retransmission of missing messages until it receives the needed messages.
+the property is proved, provided that the network does not selectively delay message retransmissions without bound while continuing to speedily deliver heartbeat messages.
 
 \subsection{Proof of Failure Detection}
+Prove: Every failure is eventually detected.
+
+Given that process $p$ has failed, it will not send out heartbeats. Algorithm~\ref{alg:failure} guarantees that each process will detect this within a finite time. Because delays can be unbounded, there is no guarantee against false positives in the failure detection.
+
+\begin{algorithm}[t]
+\KwIn{Multicast group $G$, own process identifier $p_{self}$, message $m$, sequence number $s$, along with vector timestamp $T$, and delivery acknowledgment set $D$ all indexed by $p \in G$.}
+\KwOut{Updates $s$, and $S$.}
+\For{each $p \neq p_{self} \in G$}{
+	incrementTimestamp($p_{self}$,$T$)\;
+	$m'$ = piggyback($T$, $s$, $D[p_{self}]$, $p$, $m$)\;
+	unicast($p$,$m'$)\;
+}
+incrementSequenceNumber($s$)\;
+\caption{Reliable multicast send}
+\label{alg:send}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\KwIn{$G$,$D$,$T$, $p_{self}$, message source $p_s$, message $m'$, along with delivered message store $S$, holdback queue $Q$, last delivery timestamp $T_l$, and timeout list $L$ all indexed by $p \in G$.}
+\KwOut{Updates $G$,$Q$,$T$,$T_l$, and $D$.}
+% Get the meta information from the message
+\{$T_m$, $s$, $D[p_s]$, $p_{from}$, $m$\} = unpiggyback($m'$);
+% Update the timestamp and timeout list.
+mergeTimestamps($T$,$T_m$); $L[p_s]$ = time()\;
+
+% Remove p from the group if someone else has removed it.
+\For{each $p \in D[p_s]$ such that $p \not\in D$}{
+	removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)\;
+}
+
+% If everybody has delivered the message, we don't have to keep it around anymore.
+\For{each $l \in S[p] \forall p \in G$ such that $l.s \leq \text{min}(D[p])$}{
+	removeFromMsgStore($l$,$S$)\;
+}
+\uIf{$m == \Xi$}{
+	% Someone has requested a re-transmission.
+	discard($m$)\;
+	
+	\For{each $l \in S[p_{from}]$ such that $l.s \leq s$}{
+		$m'$ = piggyback($T$, $l.s$, $D$, $p_{from}$, $l.m$)\;
+		unicast($p_s$,$m'$)\;
+	}
+}
+\uElseIf{$m == \heartsuit$}{
+	% This is just a heartbeat
+	discard($m$)\;
+}
+\Else{
+	% In case we have asked a retransmission to masquerade as someone else.
+	$p_s$ = $p_{from}$\;
+	\uIf{$s$ == $D[p_s] + 1$}{
+		incrementTimestamp($p_{self}$,$T$)\;
+		
+		\uIf{$T_l \not> q.T$}{
+			% This is the message we're expecting, and it does not violate causal
+			% ordering. Go ahead and deliver it.
+			deliver($m$); $T_l$ = $T_m$; $D[p_s]$ = $s$\;
+
+			$l.m$ = $m$; $l.s$ = $s$; addToMsgStore($l$,$S[p_s]$)\;
+		}
+		\Else{
+			% We were expecting this message, but if we were to deliver it
+			% now, causal ordering would be violated. Hold onto it for later.
+			$q.m$ = $m$; $q.s$ = $s$; $q.T$ = $T_m$; \;
+			addToQ($q$,$Q[p_s]$)\;
+		}
+		
+		% Deliver any messages in the queue if you can.
+		\Repeat{$Q$ unchanged.}{
+			\For{each $q \in Q[p] \forall p \in G$ such that $q.s$ == $D[p_s] + 1$ AND $T_l \not> q.T$}{
+				deliver($q.m$); removeFromQ($Q$,$q$); $T_l$ = $q.T$; $D[p_s]$ = $q.s$\;
+				
+				$l.m$ = $q.m$; $l.s$ = $s$; addToMsgStore($l$,$S[p]$)\;
+			}
+		}
+	}
+	\uElseIf{$s > D[p_s] + 1$}{
+		incrementTimestamp($p_{self}$,$T$)\;
+		% This message arrived before we expected.
+		% Hold onto it for later.
+		$q.m$ = $m$; $q.s$ = $s$; $q.T$ = $T_m$; addToQ($q$,$Q[p_s]$)\;
+	}
+	\Else{
+		% We've already delivered it.
+		% $s \leq D[p_s]$
+		discard($m$)\;
+	}
+}
+
+\For{each $p \neq p' \in G$ such that $D[p_{self}][p] < D[p'][p]$ AND $D[p'][p] \neq q.s \forall q \in Q[p_s]$}{
+		% p' has delivered a message from p that we haven't received.
+		% Ask p' to re-transmit that message to us, masquerading as p.
+		$m'$ = piggyback($T$, $D[p'][p]$, $D[p_{self}]$, $p$, $\Xi$); unicast($p_s$,$m'$)\;
+}
+\caption{Reliable multicast receive}
+\label{alg:rcv}
+\end{algorithm}
+
+\begin{algorithm}
+\KwIn{$G$, $p_{self}$, $Q$, $T$, $T_l$, $D$, and $L$.}
+\KwOut{Updates $G$,$Q$,$T$,$T_l$, and $D$.}
+\Repeat{end of program}{
+	\For{each $p \neq p_{self} \in G$}{
+		\eIf{$\text{time}() - L[p] \geq T_f$}{
+			% Declare a process as failed if haven't heard from it in
+			% a long time.
+			removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)\;
+		}{
+			% Send a heartbeat if we need it
+			\If{$\text{time}() - L[p_{self}] \geq T_h$}{
+				$m'$ = piggyback($T$, 0, $D[p_{self}]$, $p$, $\heartsuit$)\;
+				unicast($p$,$m'$)\;
+			}
+		}
+	}
+	$t$ = $T_h - (\text{time}() - L[p_{self}])$\;
+	sleep(min($t$,0))\;
+}
+\caption{Failure detect thread.}
+\label{alg:failure}
+\end{algorithm}
+
 \section{Conclusion}
 
 \end{document}

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <map>
 #include <vector>
+#include <algorithm>
 
 #include "mp1.h"
 
@@ -14,9 +15,144 @@
 #define HEARTBEAT_DELAY 10
 #define HEARTBEAT_MESSAGE "xoxo"
 
+//TODO: Probably you can think of better data structures, but this gets the job done I guess.
+/* State variables */
+
+struct NodeState {
+	int id;
+	int* timestamp;
+};
+
+struct IDMap{
+	int size;
+	NodeState* states;
+};
+
+//! ID map contains the local perception of the global state.
+IDMap id_map;
+
+/**
+ * Initializes the global state map.
+ */
+void state_init(void) {
+	id_map.size = mcast_num_members;
+	id_map.states = (NodeState*) malloc(sizeof(NodeState)*id_map.size);
+
+	for (int i = 0; i < id_map.size; ++i) {
+		id_map.states[i].id = mcast_members[i];
+		id_map.states[i].timestamp = (int*) calloc(id_map.size,sizeof(int));
+	}
+}
+
+/**
+ * Increment the vector timestamp.
+ */
+void timestamp_increment() {
+    id_map.states[my_id].timestamp[my_id]++;
+}
+
+/**
+ * Merges external timestamp with the existing timestamp. Assumes other_timestamp is same size and is ordered the same as local timestamp.
+ * @param [in] other_timestamp
+ */
+void timestamp_merge(int* other_timestamp){
+	for(int i = 0; i < id_map.size; ++i){
+		if(my_id != i){
+			id_map.states[my_id].timestamp[i] = max(other_timestamp[i], id_map.states[my_id].timestamp[i]);
+		}
+	}
+}
+
+/**
+ * Updates global state to include a new multicast member.
+ * @param [in] member
+ */
+void mcast_join(int member) {
+	// Make certain this really is a new member. If not, don't do anything.
+	for (int i = 0; i < id_map.size; ++i) {
+		if(id_map.states[i].id == member){
+			return;
+		}
+	}
+
+	// Allocate a new ID list.
+ 	id_map.size++;
+	NodeState* temp = (NodeState*) malloc(sizeof(NodeState)*(id_map.size));
+
+	// Copy old pointers to new list.
+	for (int i = 0; i < id_map.size-1; ++i) {
+		temp[i].id = id_map.states[i].id;
+		temp[i].timestamp = id_map.states[i].timestamp;
+	}
+
+	// Add the new member to the end.
+	temp[id_map.size-1].id = member;
+	temp[id_map.size-1].timestamp = (int*) calloc(id_map.size,sizeof(int))
+
+	// Free old list and update.
+	free(id_map.states);
+	id_map.states = temp;
+}
+
+/**
+ * Updates global state to exclude an existing multicast member.
+ * @param [in] member
+ */
+void mcast_kick(int member) {
+	// Make certain this really is a person in the group. If not, don't do anything.
+	int num = -1;
+	for (int i = 0; i < id_map.size; ++i) {
+		if(id_map.states[i].id == member){
+			num = i;
+			break;
+		}
+	}
+	if(num == -1){
+		return;
+	}
+	// Allocate a new ID list.
+	NodeState* temp = (NodeState*) malloc(sizeof(NodeState)*(id_map.size-1));
+
+	// Copy old pointers to new list.
+	for (int i = 0; i < id_map.size; ++i) {
+		if(i < num){
+			temp[i].id = id_map.states[i].id;
+			temp[i].timestamp = id_map.states[i].timestamp;
+		}
+		else if(i > num){
+			temp[i-1].id = id_map.states[i].id;
+			temp[i-1].timestamp = id_map.states[i].timestamp;
+		}
+	}
+
+	// Free the old member.
+	free(temp[num].timestamp)
+
+	// Free old list and update.
+	free(id_map.states);
+ 	id_map.size--;
+	id_map.states = temp;
+}
+
+/**
+ * De-allocates the timestamp memory.
+ */
+void state_teardown() {
+	for(int i = 0; i < id_map.size; ++i){
+		free(id_map.states[i].timestamp);
+	}
+	free(id_map.states);
+}
+
 /* General */
 
-// Flattens a bunch of strings and a timestamp into a serialized string.
+/**
+ * Encodes timestamp, message, and metadata into serialized packet for transmission.
+ * @param [in]  messages
+ * @param [in]  timestamp
+ * @param [out] combined_message
+ * @param [out] total_bytes
+ */
 void flatten(
         std::vector<const char*>& messages,
         int* timestamp,
@@ -53,6 +189,13 @@ void flatten(
     free(message_bytes);
 }
 
+/**
+ * Decodes timestamp, message, and metadata from packets encoded with flatten.
+ * @param [in]  combined_message
+ * @param [in]  total_bytes
+ * @param [out] messages
+ * @param [out] timestamp
+ */
 void unflatten(
         const char* combined_message,
         int total_bytes,
@@ -75,32 +218,7 @@ void unflatten(
     }
 }
 
-std::map<int, int> id_map;
-
-void id_map_init(void) {
-    for (int i = 0; i < mcast_num_members; ++i) {
-        id_map.insert(std::make_pair(mcast_members[i], i));
-    }
-}
-
-/* Timestamp */
-
-int *timestamp;
-
-void timestamp_init(void) {
-    timestamp = (int*) calloc(mcast_num_members, sizeof(int));
-    memset(timestamp, 1, mcast_num_members);
-}
-
-void timestamp_increment() {
-    timestamp[id_map[my_id]]++;
-}
-
-void timestamp_destroy() {
-    free(timestamp);
-}
-
-// Failure detection
+/* Failure detection */
 
 bool* failed_processes;
 pthread_t heartbeat_thread;
@@ -166,6 +284,3 @@ void receive(int source, const char *message, int len) {
     deliver(source, message);
 }
 
-void mcast_join(int member) {
-    printf("%d friggin joined.", member);
-}

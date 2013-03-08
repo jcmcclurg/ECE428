@@ -4,6 +4,10 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <ctime>
+#include <sstream>
+
+using namespace std;
 
 #include "mp1.h"
 
@@ -15,52 +19,207 @@
 #define HEARTBEAT_DELAY 10
 #define HEARTBEAT_MESSAGE "xoxo"
 
-//TODO: Probably you can think of better data structures, but this gets the job done I guess.
+#define TIMEOUT_SECONDS 60
+
+enum CausalityRelation {BEFORE,CONCURRENT,AFTER};
+enum MessageType {HEARTBEAT,RETRANSREQUEST,MESSAGE};
+
+class DeliveryAcks{
+   private:
+      int own_id;
+      map<int,int> deliveryAcks;
+
+   public:
+      DeliveryAcks(int id){
+         own_id = id;
+         deliveryAcks[own_id] = 0;
+      }
+
+      void deleteMember(int id){
+         deliveryAcks.erase(id);
+      }
+
+      void ack(int fromId , int sequenceNumber){
+         deliveryAcks[fromId] = sequenceNumber;
+      }
+};
+
+class Timestamp{
+   private:
+      int own_id;
+      map<int,int> timestamp;
+
+   public:
+      Timestamp(int id){
+         own_id = id;
+         timestamp[own_id] = 0;
+      }
+
+      void deleteMember(int id){
+         timestamp.erase(id);
+      }
+
+      void addMember(int id){
+         timestamp[id] = 0;
+      }
+
+      /**
+       * Increments own counter.
+       */
+      void step(){
+         timestamp[own_id]++;
+      }
+
+      /**
+       * Compares the vector timestamps to determine causality relation.
+       */
+      CausalityRelation compare(Timestamp* t){
+         int numLess = 0;
+         int numGreater = 0;
+         int n;
+         
+         for (map<int,int>::iterator it=timestamp.begin(); it != timestamp.end(); ++it){
+            if(it->first < t->timestamp[it->second]){
+               numLess++;
+               if(numGreater > 0){
+                  return CONCURRENT;
+               }
+            }
+            else if(it->first > t->timestamp[it->second]){
+               numGreater++;
+               if(numLess > 0){
+                  return CONCURRENT;
+               }
+            }
+         }
+
+         if(numLess > 0){
+            return BEFORE;
+         }
+         else if(numGreater > 0){
+            return AFTER;
+         }
+         else{
+            return CONCURRENT;
+         }
+      }
+
+      /**
+       * Updates the vector timestamp to include information from another timestamp.
+       */
+      void update(Timestamp* t){
+         //FIXME: Implement
+      }
+};
+
+class Message{
+   private:
+      MessageType type;
+      int sequenceNumber;
+
+      //! Process IDs and last delivered sequence numbers.
+      DeliveryAcks* deliveryAcknowledgeList;
+      vector<int>* failedNodeList;
+
+      //! ID of the original sender of the message
+      int id;
+
+      string message;
+      Timestamp* timestamp;
+
+   public:   
+      Message(string encodedMessage){
+         //FIXME: Implement
+      }
+
+      Message(MessageType tp,
+              int seqNum,
+              int idd,
+              DeliveryAcks* deliveryAckList,
+              vector<int>* failedNdeList,
+              Timestamp* ts,
+              string message){
+         type = tp;
+         sequenceNumber = seqNum;
+         failedNodeList = failedNdeList;
+         id = idd;
+         deliveryAcknowledgeList = deliveryAckList;
+         timestamp = ts;
+
+      }
+
+      string getMessage(){
+         return message;
+      }
+
+      string getEncodedMessage(){
+         //FIXME: Implement
+         return NULL;
+      }
+};
+
 /* State variables */
+class NodeState{
+   private:
+      //! The time we last heard from this node.
+      time_t lastHeardFrom;
 
-struct NodeState {
-	int id;
-	int* timestamp;
+      //! Sequence number of the last message delivered from this node.
+      int latestDeliveredSequenceNumber;
+
+      //! List of all messages sent by this node.
+      map<int, Message> undeliveredMessages;
+
+   public:
+      //! Vector timestamp, with included IDs for easy access.
+      Timestamp* timestamp;
+
+      NodeState(Timestamp* ts){
+         timestamp = ts;
+      }
+      bool isTimedOut(){
+         return time(NULL) - lastHeardFrom >= TIMEOUT_SECONDS;
+      }
+
+      void resetTimeout(){
+         lastHeardFrom = time(NULL);
+      }
 };
 
-struct IDMap{
-	int size;
-	NodeState* states;
-};
+//! Mapping from ID to node state
+map<int, NodeState*> global_state;
 
-//! ID map contains the local perception of the global state.
-IDMap id_map;
+//! The following pointer lists are used to update all the data structures when group membership changes.
+vector<Timestamp*> timestamp_list;
+vector<DeliveryAcks*> deliveryAck_list;
 
 /**
  * Initializes the global state map.
  */
 void state_init(void) {
-	id_map.size = mcast_num_members;
-	id_map.states = (NodeState*) malloc(sizeof(NodeState)*id_map.size);
-
-	for (int i = 0; i < id_map.size; ++i) {
-		id_map.states[i].id = mcast_members[i];
-		id_map.states[i].timestamp = (int*) calloc(id_map.size,sizeof(int));
+	for (int i = 0; i < mcast_num_members; ++i) {
+      Timestamp* t= new Timestamp(mcast_members[i]);
+      timestamp_list.push_back(t);
+		global_state[mcast_members[i]] = new NodeState(t);
+		global_state[mcast_members[i]]->resetTimeout();
 	}
+   DeliveryAcks* d = new DeliveryAcks(my_id);
+   deliveryAck_list.push_back(d);
 }
 
 /**
  * Increment the vector timestamp.
  */
 void timestamp_increment() {
-    id_map.states[my_id].timestamp[my_id]++;
+   global_state[my_id]->timestamp->step();
 }
 
 /**
  * Merges external timestamp with the existing timestamp. Assumes other_timestamp is same size and is ordered the same as local timestamp.
  * @param [in] other_timestamp
  */
-void timestamp_merge(int* other_timestamp){
-	for(int i = 0; i < id_map.size; ++i){
-		if(my_id != i){
-			id_map.states[my_id].timestamp[i] = max(other_timestamp[i], id_map.states[my_id].timestamp[i]);
-		}
-	}
+void timestamp_merge(Timestamp* other_timestamp){
+   global_state[my_id]->timestamp->update(other_timestamp);
 }
 
 /**
@@ -69,29 +228,8 @@ void timestamp_merge(int* other_timestamp){
  */
 void mcast_join(int member) {
 	// Make certain this really is a new member. If not, don't do anything.
-	for (int i = 0; i < id_map.size; ++i) {
-		if(id_map.states[i].id == member){
-			return;
-		}
-	}
-
-	// Allocate a new ID list.
- 	id_map.size++;
-	NodeState* temp = (NodeState*) malloc(sizeof(NodeState)*(id_map.size));
-
-	// Copy old pointers to new list.
-	for (int i = 0; i < id_map.size-1; ++i) {
-		temp[i].id = id_map.states[i].id;
-		temp[i].timestamp = id_map.states[i].timestamp;
-	}
-
-	// Add the new member to the end.
-	temp[id_map.size-1].id = member;
-	temp[id_map.size-1].timestamp = (int*) calloc(id_map.size,sizeof(int))
-
-	// Free old list and update.
-	free(id_map.states);
-	id_map.states = temp;
+   // Update global_state, timestamp_list, and deliveryAck_list.
+   // FIXME: Implement.
 }
 
 /**
@@ -100,53 +238,22 @@ void mcast_join(int member) {
  */
 void mcast_kick(int member) {
 	// Make certain this really is a person in the group. If not, don't do anything.
-	int num = -1;
-	for (int i = 0; i < id_map.size; ++i) {
-		if(id_map.states[i].id == member){
-			num = i;
-			break;
-		}
-	}
-	if(num == -1){
-		return;
-	}
-	// Allocate a new ID list.
-	NodeState* temp = (NodeState*) malloc(sizeof(NodeState)*(id_map.size-1));
-
-	// Copy old pointers to new list.
-	for (int i = 0; i < id_map.size; ++i) {
-		if(i < num){
-			temp[i].id = id_map.states[i].id;
-			temp[i].timestamp = id_map.states[i].timestamp;
-		}
-		else if(i > num){
-			temp[i-1].id = id_map.states[i].id;
-			temp[i-1].timestamp = id_map.states[i].timestamp;
-		}
-	}
-
-	// Free the old member.
-	free(temp[num].timestamp)
-
-	// Free old list and update.
-	free(id_map.states);
- 	id_map.size--;
-	id_map.states = temp;
+   // Update global_state, timestamp_list, and deliveryAck_list.
+   // FIXME: Implement.
 }
 
 /**
  * De-allocates the timestamp memory.
  */
 void state_teardown() {
-	for(int i = 0; i < id_map.size; ++i){
-		free(id_map.states[i].timestamp);
-	}
-	free(id_map.states);
+   // Do opposite of state_init()
+   // FIXME: Implement.
 }
 
 /* General */
 
 /**
+ * FIXME: Move to Message constructor
  * Encodes timestamp, message, and metadata into serialized packet for transmission.
  * @param [in]  messages
  * @param [in]  timestamp
@@ -190,6 +297,7 @@ void flatten(
 }
 
 /**
+ * FIXME: Move to Message constructor
  * Decodes timestamp, message, and metadata from packets encoded with flatten.
  * @param [in]  combined_message
  * @param [in]  total_bytes
@@ -219,7 +327,6 @@ void unflatten(
 }
 
 /* Failure detection */
-
 bool* failed_processes;
 pthread_t heartbeat_thread;
 
@@ -245,8 +352,7 @@ void heartbeat_destroy(void) {
 
 void multicast_init(void) {
     unicast_init();
-    id_map_init();
-    timestamp_init();
+    state_init();
 }
 
 /* Basic multicast implementation */
@@ -255,6 +361,7 @@ void multicast(const char *message) {
     
     char* combined_message = NULL;
     int total_bytes;
+    int* timestamp;
 
     std::vector<const char*> messages;
     messages.push_back("abc");
@@ -277,9 +384,6 @@ void receive(int source, const char *message, int len) {
     std::vector<const char*> messages;
     int* other_timestamp;    
     unflatten(message, len, messages, other_timestamp);
-
-    printf("other timestamp: %d\n", other_timestamp[id_map[my_id]]);
-    printf("last timestamp: %d\n", other_timestamp[mcast_num_members - 1]);
 
     deliver(source, message);
 }

@@ -2,6 +2,7 @@
 #define TIMESTAMP_H_
 
 #include <map>
+#include <string>
 
 using namespace std;
 
@@ -14,9 +15,6 @@ class Timestamp {
 
   public:
     Timestamp(int own_id);
-
-    void deleteMember(int id);
-    void addMember(int id);
 
     /**
     * Increments own counter.
@@ -32,6 +30,8 @@ class Timestamp {
     * Updates the vector timestamp to include information from another timestamp.
     */
     void update(const Timestamp& t);
+
+    string serialize();
 };
 
 #endif

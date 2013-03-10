@@ -4,14 +4,6 @@ Timestamp::Timestamp(int own_id) : own_id(own_id){
   timestamp[own_id] = 0;
 }
 
-void Timestamp::deleteMember(int id){
-  timestamp.erase(id);
-}
-
-void Timestamp::addMember(int id){
-  timestamp[id] = 0;
-}
-
 void Timestamp::step(){
   timestamp[own_id]++;
 }
@@ -46,5 +38,13 @@ CausalityRelation Timestamp::compare(Timestamp& t) const {
 }
 
 void Timestamp::update(const Timestamp& t){
+  for (map<int, int>::iterator it=timestamp.begin(); it != timestamp.end(); ++it){
+    if(it->first != own_id && it->second < t.timestamp[it->first]){
+      timestamp[it->first] = t.timestamp[it->first];
+    }
+  }
+}
+
+string Timestamp::serialize() {
 
 }

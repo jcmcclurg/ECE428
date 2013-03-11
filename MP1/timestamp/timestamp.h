@@ -10,11 +10,14 @@ enum CausalityRelation {BEFORE, CONCURRENT, AFTER};
 
 class Timestamp {
   private:
-    int own_id;
+    int ownId;
     map<int, int> timestamp;
 
   public:
-    Timestamp(int own_id);
+    Timestamp(int ownId);
+
+    int getOwnId() const { return ownId; }
+    map<int, int>& getTimestamp() { return timestamp; } 
 
     /**
     * Increments own counter.
@@ -29,9 +32,7 @@ class Timestamp {
     /**
     * Updates the vector timestamp to include information from another timestamp.
     */
-    void update(const Timestamp& t);
-
-    string serialize();
+    void update(Timestamp& t);
 };
 
 #endif

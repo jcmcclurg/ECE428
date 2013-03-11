@@ -1,12 +1,7 @@
 #ifndef MESSAGE_H_
 #define MESSAGE_H_
 
-#define MESSAGE_HEADER '\x1f'
-#define TIMESTAMP_HEADER '\x1d'
-
-#include "../delivery/delivery_ack.h"
 #include "../timestamp/timestamp.h"
-#include "../state/node_state.hpp"
 #include <set>
 #include <string>
 #include <vector>
@@ -17,17 +12,33 @@ enum MessageType {HEARTBEAT, RETRANSREQUEST, MESSAGE};
 
 class Message{
   private:
-    GlobalState& globalState;
+    // Process specific properties
+    int senderId;
+    int sequenceNumber;
+    Timestamp* timestamp;
+
+    // Message specific properties
     MessageType type;
     string message;
 
-    int sequenceNumber;
+    // Acknowledgements
+    vector<pair<int, int> > acknowledgements;
+
+    // Not actually serialized. Used for message store bookkeeping.
+    set<int> undeliveredNodes;
 
   public:   
-    Message(string encodedMessage);
-    Message(GlobalState& globalState, MessageType type, string message);
+    Message(
+        int senderId, 
+        int sequenceNumber, 
+        Timestamp& timestamp,
+        MessageType type, 
+        string message, 
+        vector<pair<int, int> > acknowledgements);
+    Message(const string& encoded);
+    ~Message();
 
-    string getMessage();
+    string getMessage() { return message; }
     string getEncodedMessage();
 };
 

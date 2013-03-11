@@ -3,17 +3,14 @@ all: chat
 SOURCEFILES = unicast.cc mcast.cc chat.cc
 HEADERS = mp1.h
 
-delivery: delivery.cc
-	g++ ${CFLAGS} -g -o $@ $^
+message.o: message/message.cc
+	g++ -g -c $^
 
-message: message.cc
-	g++ ${CFLAGS} -g -o $@ $^
+timestamp.o: timestamp/timestamp.cc 
+	g++ -g -c $^
 
-timestamp: timestamp.cc
-	g++ ${CFLAGS} -g -o $@ $^
-
-chat: $(SOURCEFILES) $(HEADERS)
-	g++ ${CFLAGS} -g -pthread -o $@ $(SOURCEFILES)
+chat: $(SOURCEFILES) $(HEADERS) message.o timestamp.o
+	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o
 
 clean:	restart
 	-rm -f chat *.o *~

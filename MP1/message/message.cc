@@ -1,5 +1,7 @@
 #include "message.h"
+#include "../timestamp/timestamp.h"
 #include <assert.h>
+#include <iostream>
 
 Message::Message(
     int senderId, 
@@ -7,18 +9,19 @@ Message::Message(
     Timestamp& timestamp,
     MessageType type, 
     string message, 
-    vector<pair<int, int> > acknowledgements) :
+    map<int, int>& acknowledgements,
+    set<int>& failedNodes) :
       senderId(senderId), 
       sequenceNumber(sequenceNumber), 
       type(type), 
       message(message), 
-      acknowledgements(acknowledgements) {
+      acknowledgements(acknowledgements),
+      failedNodes(failedNodes),
+      needsDelete(false) {
 
-  this->timestamp = new Timestamp(timestamp);      
-}
-
-Message::~Message() {
-  delete timestamp;
+  // TODO: The only reason this->timestamp isn't a reference is that
+  // we have a hard time initializing it in the other constructor.
+  this->timestamp = new Timestamp(timestamp);
 }
 
 static int munchInteger(const string& buffer, int& offset) {
@@ -28,7 +31,7 @@ static int munchInteger(const string& buffer, int& offset) {
 }
 
 
-Message::Message(const string& encoded) {
+Message::Message(const string& encoded) : needsDelete(true) {
   int offset = 0;
 
   // Type header
@@ -51,7 +54,7 @@ Message::Message(const string& encoded) {
   // Sequence number
   int senderIdSize = munchInteger(encoded, offset); assert(senderIdSize == 1);
   senderId = munchInteger(encoded, offset);
-  timestamp = new Timestamp(senderId);
+  map<int,int> ts;
 
   // Sequence number
   int sequenceSize = munchInteger(encoded, offset);
@@ -64,17 +67,26 @@ Message::Message(const string& encoded) {
   for (int i = 0; i < pairs; ++i) {
     int id = munchInteger(encoded, offset);
     int sequenceNumber = munchInteger(encoded, offset);
-    acknowledgements.push_back(make_pair<int, int>(id, sequenceNumber));
+    acknowledgements[id] = sequenceNumber;
   }
 
   // Timestamp
   int timestampBytes = munchInteger(encoded, offset);
-  int values = timestampBytes / sizeof(int);
-  for (int i = 0; i < values; ++i) {
+  int count = timestampBytes / sizeof(int);
+  for (int i = 0; i < count; ++i) {
     int id = munchInteger(encoded, offset);
     int count = munchInteger(encoded, offset);
-    timestamp->getTimestamp()[id] = count;
-  } 
+    ts[id] = count;
+  }
+  timestamp = new Timestamp(senderId, ts);
+
+  // Failed nodes
+  int failedNodesBytes = munchInteger(encoded, offset);
+  count = failedNodesBytes / sizeof(int);
+  for (int i = 0; i < count; ++i) {
+    int id = munchInteger(encoded, offset);
+    failedNodes.insert(id);
+  }
 }
 
 static void appendInteger(string& buffer, int val) {
@@ -84,7 +96,7 @@ static void appendInteger(string& buffer, int val) {
 
 //! Message format shown below. Each block is prefixed with a four byte length message.
 //! A bit overkill, but would be needed for any sort of platform independent representation.
-//! [message type][message (optional)][sender id][sequence number][acknowledgements][timestamp]
+//! [message type][message (optional)][sender id][sequence number][acknowledgements][timestamp][failed nodes]
 string Message::getEncodedMessage(){
   string result;
 
@@ -116,7 +128,7 @@ string Message::getEncodedMessage(){
   // Two integers (process ID and sequence number) per external node.
   int ackListBytes = acknowledgements.size() * 2 * sizeof(int);
   appendInteger(result, ackListBytes); // Block header!
-  for (vector<pair<int, int> >::iterator it = acknowledgements.begin(); 
+  for (map<int, int>::iterator it = acknowledgements.begin(); 
       it != acknowledgements.end(); 
       ++it) {
 
@@ -125,16 +137,41 @@ string Message::getEncodedMessage(){
   }
 
   // Timestamp
-  int timestampBytes = timestamp->getTimestamp().size() * sizeof(int);
+  int timestampBytes = timestamp->getTimestampMap().size() * sizeof(int);
   appendInteger(result, timestampBytes);
   for (
-      map<int, int>::iterator it = timestamp->getTimestamp().begin(); 
-      it != timestamp->getTimestamp().end(); 
+      map<int, int>::iterator it = timestamp->getTimestampMap().begin(); 
+      it != timestamp->getTimestampMap().end(); 
       ++it) {
 
     appendInteger(result, it->first);
     appendInteger(result, it->second);
   }
 
+  // Failed nodes
+  int failedNodesBytes = failedNodes.size() * sizeof(int);
+  appendInteger(result, failedNodesBytes);
+  for (
+      set<int>::iterator it = failedNodes.begin(); 
+      it != failedNodes.end(); 
+      ++it) {
+
+    appendInteger(result, *it);
+  }
+
   return result;
+}
+
+bool operator<(const Message& a, const Message& b){
+  CausalityRelation r = a.timestamp->compare(*(b.timestamp));
+  if(r == BEFORE){
+    return true;
+  }
+  else if(r == AFTER){
+    return false;
+  }
+  else
+  {
+    return a.senderId < b.senderId;
+  }
 }

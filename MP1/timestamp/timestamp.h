@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -14,10 +15,12 @@ class Timestamp {
     map<int, int> timestamp;
 
   public:
-    Timestamp(int ownId);
+    Timestamp(int id, int* memberIds, int memberCount);
+    Timestamp(int id, map<int,int> timestampMap);
+    Timestamp(int id, vector<int> ids);
 
     int getOwnId() const { return ownId; }
-    map<int, int>& getTimestamp() { return timestamp; } 
+    map<int, int>& getTimestampMap() { return timestamp; } 
 
     /**
     * Increments own counter.

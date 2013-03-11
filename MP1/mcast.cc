@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <stdlib.h>
 #include <sstream>
 
 using namespace std;
@@ -20,83 +21,102 @@ using namespace std;
 #define HEARTBEAT_SECONDS 10
 #define TIMEOUT_SECONDS 60
 
-//! The global state information and heartbeat detector.
+//! The global state information
 GlobalState* globalState;
 Heartbeat* heartbeat;
 
-void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
-  int id = si->si_value.sival_int;
+//! Forward declaration for our multicast function.
+void multicast(const char *message, MessageType type);
+
+static void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
+  int failedId = si->si_value.sival_int;
+  globalState->state.getFailedNodes().insert(failedId);
 }
 
-void heartbeat_send() {
-  multicast("xoxo");
+static void heartbeat_send() {
+  multicast("xoxo", HEARTBEAT);
 }
 
+/**
+ * IMPORTANT: Assumes that the group membership will not grow during runtime.
+ */
 void multicast_init(void) {
   unicast_init();
   globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
   heartbeat = new Heartbeat(mcast_members, mcast_num_members, 500, heartbeat_failure, heartbeat_send);
-  heartbeat.arm();
+  heartbeat->arm();
 }
 
-void multicast_deliver(int id, Message* m){
-  deliver(my_id, (char*) m->getMessage().c_str());
+void multicast_deliver(Message& m){
+  if (m.getSenderId() == my_id) {
+    globalState->state.sequenceNumberIncrement();
+  } else {
+    globalState->externalStates[m.getSenderId()]->latestDeliveredSequenceNumberIncrement();
+  }
+  deliver(m.getSenderId(), m.getMessage().c_str());
 }
 
-void discard(Message* m){
-  // Remove from message store
-  // Free up memory
-}
+static void populateAcknowledgements(
+      map<int, int>& acknowledgements, 
+      map<int, ExternalNodeState*>& externalStates) {
 
-/**
- * Reliable multicast implementation.
- */
-void multicast(const char *message) {
-  NodeState& state = globalState->state;
-  map<int, ExternalNodeState*> externalStates = globalState->externalStates;
-
-  //! Increment the timestamp before you do anything else.
-  state.timestampIncrement();
-
-  vector<pair<int, int> > acknowledgements;
   for (
       map<int, ExternalNodeState*>::iterator it = externalStates.begin();
       it != externalStates.end();
       it++) {
 
-    acknowledgements.push_back(make_pair<int, int>(
-      it->first, it->second->getLatestDeliveredSequenceNumber()
-    ));
+    acknowledgements[it->first] = it->second->getLatestDeliveredSequenceNumber();
   }
+}
 
-  //! Wrap the message in a Message object.
+/**
+ * Reliable multicast implementation.
+ */
+void multicast(const char *message, MessageType type) {
+  NodeState& state = globalState->state;
+  map<int, ExternalNodeState*> externalStates = globalState->externalStates;
+
+  // Increment the timestamp before you do anything else.
+  state.getTimestamp().step();
+
+  map<int, int> acknowledgements;
+  populateAcknowledgements(acknowledgements, externalStates);
+
+  // Wrap the message in a Message object.
   Message* m = new Message(
     state.getId(),
     state.getSequenceNumber(),
     state.getTimestamp(),
-    MESSAGE,
+    type,
     string(message),
-    acknowledgements
+    acknowledgements,
+    state.getFailedNodes()
   );
 
   // Deliver to yourself first, so that if you fail before sending it to everyone, the message can still 
   // get re-transmitted by someone else without violating the R-multicast properties.
-  multicast_deliver(my_id, m);
+  if (type != HEARTBEAT) {
+    multicast_deliver(*m);
 
-  // Add to the sent messages list so you can grab this message again in case a retransmission is needed.
-  state.messageStore.push_back(m);
+    // Add to the sent messages list so you can grab this message again in case a retransmission is needed.
+    state.storeMessage(m);
+  }
 
   // Unicast all the messages.
-  for (map<int, ExternalNodeState*>::iterator it = externalStates.begin(); it != externalStates.end(); ++it){
+  for (
+      map<int, ExternalNodeState*>::iterator it = externalStates.begin();
+      it != externalStates.end();
+      it++) {
+
     // There's no need to send it to ourselves since we've already delivered the message.
-    if (it->first != my_id) {
+    if(it->first != my_id) {
       string em = m->getEncodedMessage();
       usend(it->first, em.c_str(), em.size());
     }
   }
 
   // Increment your own sent message sequence number.
-  state.sequenceNumberIncrement();
+  // state.sequenceNumberIncrement();
 }
 
 void multicast(const char *message) {
@@ -107,93 +127,132 @@ void mcast_join(int member) {
   printf("%d friggin joined.", member);
 }
 
+void discard(Message* m) {
+  // Free up some memory or something?
+}
+
 void receive(int source, const char *message, int len) {
-  assert(message[len-1] == 0);
   assert(source != my_id);
 
   NodeState& state = globalState->state;
   map<int, ExternalNodeState*> externalStates = globalState->externalStates;
 
   // Increment the timestamp before you do anything else.
-  state.timestampIncrement();
+  state.getTimestamp().step();
 
   // De-serialize the message into a new Message object. 
   Message* m = new Message(string(message));
 
   // Update our state based on receive information from node m->id.
-  state.timestampMerge(m->getTimestamp());
-  state.messageStore.push_back(m);
-  update_message_store(m->id,m->deliveryAckList);
-  update_failed_node_list(m->failed_nodes);
-  reset_node_timeouts();
+  state.getTimestamp().update(m->getTimestamp());
+  externalStates[m->getSenderId()]->updateDeliveryAckList(m->getAcknowledgements());
+  state.updateFailedNodes(m->getFailedNodes());
 
-  if (m->getType() == MessageType::RETRANSMISSION) {
-    int from_id;
-    int to_id;
-    int seq_num;
-    decode_retransmission_message(m->getMessage(),&from_id,&to_id,&seq_num);
-    Message* m = get_message_from_store(from_id,seq_num);
-    unicast(to_id,m->getEncodedMessage(), m->getEncodedMessageLength());
+  if(m->getType() == RETRANSREQUEST) {
+    int fromId = m->getSenderId();
+    int toId;
+    int sequenceNumber = m->getSequenceNumber();
+
+    stringstream ss(m->getMessage());
+    ss >> toId;
+
+    Message* m = NULL;
+
+    // Are you asking for one of my messages?
+    if (fromId == state.getId()) {
+      m = state.getMessage(sequenceNumber);
+    } else {
+      m = externalStates[fromId]->getMessage(sequenceNumber);
+    }
+    assert(m != NULL);
+
+    // TODO: UPDATE FIELDS IN RETRANSMISSION MESSAGE
+
+    string em = m->getEncodedMessage();
+    usend(toId, em.c_str(), em.size());
+
+    discard(m);
   }
-  else if(m->getType() == MessageType::MESSAGE){
+  else if(m->getType() == MESSAGE) {
+    ExternalNodeState& externalState = *externalStates[m->getSenderId()];
+    int latestDeliveredSequenceNumber = externalState.getLatestDeliveredSequenceNumber();
+
     // Have you already delivered this message?
-    ExternalNodeState& external = *externalStates[m->getId()];
-    if (m->getSequenceNumber() <= external->getLatestDeliveredSequenceNumber()) {
+    if (m->getSequenceNumber() <= latestDeliveredSequenceNumber) {
       discard(m);
-    } 
-    // Have you already gotten this message?
-    else if (!external.holdbackQueue.contains(m)) {
-      external.holdbackQueue.push(m);
+    }
+    // This sequence is next in line! Good to deliver.
+    else if (m->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
+      multicast_deliver(*m);
 
-      // Try to deliver some of the messages
-      bool delivered=true;
-      while(delivered) {
-        delivered =false;
-        vector<Message*> deliverables;
-        for(each message a in holdback queue){
-          // Is this the message you are expecting?
-          if(a->sequenceNumber == global_delivery_list(a->id) + 1){
-            deliverables.push_end(a);
-            delivered = true;
-          }
+      // Maybe we can deliver some more messages before we're done.
+      for (
+          vector<Message*>::iterator it = externalState.getMessageStore().begin(); 
+          it != externalState.getMessageStore().end(); 
+          ++it) {
+
+        // Is this the message you are expecting?
+        if((*it)->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
+          multicast_deliver(*(*it));
         }
-
-        // Sort the messages according to the partial order determined by their timestamps, such that
-        // the causality relation is maintained.
-        partial_order_message_list = sort_messages(&deliverables);
-
-        // Recursively delivers messages along the tree. The behavior is as follows:
-        // 1. Start with the end node.
-        // 2. For each node
-        //    a. Iterate through the predecessor nodes if possible.
-        //    b. Deliver the node's message.
-        deliver_along_partial_order_tree(partial_order_message_list);
+      }
+    } 
+    // We're missing some messages...
+    else {
+      // Have you already gotten this message?
+      if(externalState.getMessage(m->getSequenceNumber()) == NULL) {
+        // Store this message in the appropriate store.
+        externalState.storeMessage(m);
       }
 
-      // Find all the sequence numbers that we are missing.
-      map<int,int> seqNumbers = findMissingSequenceNumbers();
+      // Calculate the delta in sequence numbers so we can request a retransmission.
+      int delta = m->getSequenceNumber() - latestDeliveredSequenceNumber;
 
       // Ask for re-transmissions from everyone known to have delivered the messages we need.
       // The reason we ask everyone is that the original sender may have failed.
-      for(each id, seqnumber in seqNumbers){
-        vector<int> nodes = find_nodes_that_delivered_seqNumber(seqnumber);
-        assert(nodes not empty);
+      for (int i = latestDeliveredSequenceNumber + 1; i < m->getSequenceNumber(); i++) {
+        vector<int> nodes;
+        for (
+            map<int, ExternalNodeState*>::iterator it = externalStates.begin();
+            it != externalStates.end();
+            it++) {
 
-        Message* r = new Message(retransmission request for message id,seqnumber);
+          // Has this process delivered the message we need?
+          if (it->second->getExternalLatestDeliveredSequenceNumber(m->getSenderId()) >= m->getSequenceNumber()) {
+            nodes.push_back(it->first);
+          }
+        }
 
-        for(each to_id in nodes){
-          unicast(to_id,m->getEncodedMessage(), m->getEncodedMessageLength());
+        assert(!nodes.empty());
+
+        map<int, int> acknowledgements;
+        populateAcknowledgements(acknowledgements, externalStates);
+
+        stringstream ss;
+        ss << i;
+
+        // We don't have store this, so it's safe to use stack memory.
+        Message rm(
+          state.getId(),
+          state.getSequenceNumber(),
+          state.getTimestamp(),
+          RETRANSREQUEST,
+          ss.str(),
+          acknowledgements,
+          state.getFailedNodes()
+        );
+
+        for (vector<int>::iterator it = nodes.begin(); it != nodes.end(); ++it) { 
+          string em = rm.getEncodedMessage();
+          usend(*it, em.c_str(), em.size());
         }
       }
-    }
-    else{
-      discard(m);
     }
   }
   else { // if(m->type == HEARTBEAT)
     discard(m);
   }
 
-  timestamp_update();
+  state.getTimestamp().update(m->getTimestamp());
   deliver(source, message);
 }

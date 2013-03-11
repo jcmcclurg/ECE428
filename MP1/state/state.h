@@ -4,12 +4,14 @@
 #include "../message/message.h"
 #include "../timestamp/timestamp.h"
 
+#include <algorithm>
 #include <vector>
 #include <queue>
 #include <set>
 
 using namespace std;
 
+// Represents our current process.
 class NodeState{
   private:
     //! Unique identifier for this process. 
@@ -18,10 +20,8 @@ class NodeState{
     //! Sequence counter.
     int sequenceNumber;
 
-    //! List of all potentially undelivered messages sent by this node. There's an additional set 
-    //! tagged to every sequence number to keep track of which nodes have NOT successfully delivered.
-    //! We'll occaisonally prune the beginning of this list and removing messages everyone has delivered.
-    vector<Message> messageStore;
+    //! List of all messages sent by this node.
+    vector<Message*> messageStore;
 
     //! Set keeping track of all nodes this process believes to have failed.
     set<int> failedNodes;
@@ -30,37 +30,43 @@ class NodeState{
     Timestamp timestamp;
 
   public:
-    NodeState(int id) : id(id), timestamp(id) {}
+    NodeState(int id, vector<int> ids) : id(id), timestamp(id, ids) {}
+    NodeState(int id, int* memberIds, int memberCount) : id(id), timestamp(id, memberIds, memberCount) {}
+    ~NodeState(){
+      for (vector<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
+        delete *it;
+      }
+    }
 
     int getId() { return id; }
     int getSequenceNumber() { return sequenceNumber; }
     Timestamp& getTimestamp() { return timestamp; }
+    vector<Message*>& getMessageStore() { return messageStore; }
+    set<int>& getFailedNodes() { return failedNodes; }
+
+    Message* getMessage(int sequenceNumber) {
+      for (vector<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
+        if((*it)->getSequenceNumber() == sequenceNumber) {
+          return *it;
+        }
+      }
+      return NULL;
+    }
+    void storeMessage(Message* m) { messageStore.push_back(m); }
+
+    void updateFailedNodes(set<int>& otherFailedNodes) {
+      failedNodes.insert(otherFailedNodes.begin(), otherFailedNodes.end());
+    }
 
     /**
-     * Increment the sequence number;
+     * Increment the sequence number
      */
     void sequenceNumberIncrement() {
       sequenceNumber++;
     }
-
-    /**
-     * Increment the vector timestamp.
-     */
-    void timestampIncrement() {
-      timestamp.step();
-    }
-
-    /**
-     * Merges external timestamp with the existing timestamp. Assumes otherTimestamp
-     * is same size and is ordered the same as local timestamp.
-     *
-     * @param [in] otherTimestamp
-     */
-    void timestampMerge(Timestamp& otherTimestamp){
-      timestamp.update(otherTimestamp);
-    }
 };
 
+// Represents data we need to know about other processes.
 class ExternalNodeState{
   private:
     //! Unique identifier for this external process. 
@@ -69,22 +75,54 @@ class ExternalNodeState{
     //! Sequence number of the last message delivered from this node.
     int latestDeliveredSequenceNumber;
 
-    //! Queue of messages sent by this node that we can't deliver just yet.
-    queue<Message> holdbackQueue;
+    //! List of all messages sent by this node.
+    vector<Message*> messageStore;
+
+    //! Sequence number of the messages this node has delivered
+    map<int, int> deliveryAckList;
 
   public:
     ExternalNodeState(int id) : id(id) {}
 
     int getId() const { return id; }
     int getLatestDeliveredSequenceNumber() const { return latestDeliveredSequenceNumber; }
-    const queue<Message>& getHoldbackQueue() const { return holdbackQueue; }
+    vector<Message*> getMessageStore(){ return messageStore; }
+
+    /**
+     * Increment the latest sequence number
+     */
+    void latestDeliveredSequenceNumberIncrement() {
+      latestDeliveredSequenceNumber++;
+    }
+
+    void updateDeliveryAckList(map<int,int> list){
+      for (
+          map<int, int>::iterator it = list.begin();
+          it != list.end();
+          it++) {
+
+        deliveryAckList[it->first] = max(deliveryAckList[it->first], it->second);
+      }
+    }
+
+    Message* getMessage(int sequenceNumber) {
+      for (vector<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
+        if((*it)->getSequenceNumber() == sequenceNumber) {
+          return *it;
+        }
+      }
+      return NULL;
+    }
+    void storeMessage(Message* m) { messageStore.push_back(m); }
+
+    int getExternalLatestDeliveredSequenceNumber(int id) { return deliveryAckList[id]; }
 };
 
 struct GlobalState {
   NodeState state;
   map<int, ExternalNodeState*> externalStates;
 
-  GlobalState(int ownId, int* memberIds, int memberCount) : state(ownId) {
+  GlobalState(int ownId, int* memberIds, int memberCount) : state(ownId, memberIds, memberCount) {
     for (int i = 0; i < memberCount; ++i) {
       if (memberIds[i] != ownId) {
         externalStates[memberIds[i]] = new ExternalNodeState(memberIds[i]);

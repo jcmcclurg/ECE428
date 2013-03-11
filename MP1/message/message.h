@@ -11,10 +11,12 @@ using namespace std;
 enum MessageType {HEARTBEAT, RETRANSREQUEST, MESSAGE};
 
 class Message{
+  friend bool operator<(const Message& a, const Message& b);
   private:
     // Process specific properties
     int senderId;
     int sequenceNumber;
+    bool needsDelete;
     Timestamp* timestamp;
 
     // Message specific properties
@@ -22,10 +24,10 @@ class Message{
     string message;
 
     // Acknowledgements
-    vector<pair<int, int> > acknowledgements;
+    map<int, int> acknowledgements;
 
-    // Not actually serialized. Used for message store bookkeeping.
-    set<int> undeliveredNodes;
+    // Indicates failed nodes
+    set<int> failedNodes;
 
   public:   
     Message(
@@ -34,19 +36,21 @@ class Message{
         Timestamp& timestamp,
         MessageType type, 
         string message, 
-        vector<pair<int, int> > acknowledgements);
+        map<int, int>& acknowledgements,
+        set<int>& failedNodes);
     Message(const string& encoded);
-    ~Message();
+    ~Message(){ if(needsDelete) delete timestamp; }
 
     int getSenderId() { return senderId; }
     int getSequenceNumber() { return sequenceNumber; }
-    Timestamp* getTimestamp() { return timestamp; }
+    Timestamp& getTimestamp() { return *timestamp; }
     MessageType getType() { return type; }
     string getMessage() { return message; }
-    vector<pair<int, int> >& getAcknowledgements() { return acknowledgements; }
+    map<int, int>& getAcknowledgements() { return acknowledgements; }
+    set<int>& getFailedNodes() { return failedNodes; }
 
     string getEncodedMessage();
-    set<int>& getUndeliveredNodes() { return undeliveredNodes; }
 };
+bool operator<(const Message& a, const Message& b);
 
 #endif

@@ -22,7 +22,7 @@ Message::Message(
   this->timestamp = new Timestamp(timestamp);
 }
 
-int munchInteger(const string& buffer, int& offset) {
+static int munchInteger(const string& buffer, int& offset) {
   int i = *(reinterpret_cast<const int*>(buffer.c_str() + offset));
   offset += sizeof(int);
   return i;
@@ -79,7 +79,7 @@ Message::Message(const string& encoded) : needsDelete(true) {
   timestamp = new Timestamp(senderId,ts);
 }
 
-void appendInteger(string& buffer, int val) {
+static void appendInteger(string& buffer, int val) {
   char* ca = reinterpret_cast<char*>(&val);
   buffer.append(ca, sizeof(int));
 }

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <vector>
 
+#include "heartbeat/heartbeat.h"
 #include "state/state.h"
 #include "message/message.h"
 #include "timestamp/timestamp.h"

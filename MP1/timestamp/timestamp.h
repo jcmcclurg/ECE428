@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -10,11 +11,16 @@ enum CausalityRelation {BEFORE, CONCURRENT, AFTER};
 
 class Timestamp {
   private:
-    int own_id;
+    int ownId;
     map<int, int> timestamp;
 
   public:
-    Timestamp(int own_id);
+    Timestamp(int id, int* memberIds, int memberCount);
+    Timestamp(int id, map<int,int> timestampMap);
+    Timestamp(int id, vector<int> ids);
+
+    int getOwnId() const { return ownId; }
+    map<int, int>& getTimestampMap() { return timestamp; } 
 
     /**
     * Increments own counter.
@@ -29,9 +35,7 @@ class Timestamp {
     /**
     * Updates the vector timestamp to include information from another timestamp.
     */
-    void update(const Timestamp& t);
-
-    string serialize();
+    void update(Timestamp& t);
 };
 
 #endif

@@ -10,53 +10,17 @@
 
 using namespace std;
 
-#include "../state/node_state.hpp"
+#include "message/message.h"
+#include "state/state.h"
+#include "timestamp/timestamp.h"
 #include "mp1.h"
 
 /* Defines */
-
-#define MESSAGE_HEADER '\x1f'
-#define TIMESTAMP_HEADER '\x1d'
-
-#define HEARTBEAT_DELAY 10
-#define HEARTBEAT_MESSAGE "xoxo"
-
+#define HEARTBEAT_SECONDS 10
 #define TIMEOUT_SECONDS 60
 
 //! The global state information
-GlobalState globalState(my_id);
-
-/**
- * Increment the vector timestamp.
- */
-void timestamp_increment() {
-  global_timestamp->step();
-}
-
-/**
- * Merges external timestamp with the existing timestamp. Assumes other_timestamp is same size and is ordered the same as local timestamp.
- * @param [in] other_timestamp
- */
-void timestamp_merge(Timestamp* other_timestamp){
-  global_timestamp->update(other_timestamp);
-}
-
-/**
- * De-allocates the timestamp memory. Does the opposite of state_init().
- */
-void state_teardown() {
-  for (map<int,NodeState*>::iterator it=global_state.begin(); it != global_state.end(); ++it){
-    delete global_state[it->first];
-  }
-
-  for (vector<Timestamp*>::iterator it=timestamp_list.begin(); it != timestamp_list.end(); ++it){
-    delete *it;
-  }
-
-  for (vector<DeliveryAcks*>::iterator it=deliveryAck_list.begin(); it != deliveryAck_list.end(); ++it){
-    delete *it;
-  }
-}
+GlobalState* globalState;
 
 /* Failure detection */
 pthread_t heartbeat_thread;
@@ -64,10 +28,9 @@ pthread_t heartbeat_thread;
 void *heartbeat_thread_main(void *arg) {
   timespec req;
   req.tv_sec = 0;
-  req.tv_nsec = HEARTBEAT_DELAY * 1000000L;
+  req.tv_nsec = HEARTBEAT_SECONDS * 1000000L;
   while(1) {
     nanosleep(&req, NULL);
-            
   }
 }
 
@@ -78,26 +41,13 @@ void heartbeat_init(void) {
   }
 }
 
-void heartbeat_destroy(void) {
-  
-}
-
-void add_to_message_store(Message* m){
-  state->messageStore[m->sequenceN]
-  global_state[my_id]->sentMessages[m->sequence_number] = m;
-}
-
 void multicast_init(void) {
   unicast_init();
-  state_init();
+  globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
 }
 
 void multicast_deliver(int id, Message* m){
   deliver(my_id, (char*) m->getMessage().c_str());
-}
-
-void multicast(Message* m) {
-  multicast();
 }
 
 void discard(Message* m){
@@ -109,19 +59,32 @@ void discard(Message* m){
  * Reliable multicast implementation.
  */
 void multicast(const char *message) {
-  pthread_mutex_lock(&member_lock);
+  NodeState& state = globalState->state;
+  map<int, ExternalNodeState*> externalStates = globalState->externalStates;
 
-  // Increment the timestamp before you do anything else.
-  timestamp_increment();
+  //! Increment the timestamp before you do anything else.
+  state.timestampIncrement();
 
-  // Wrap the message in a Message object.
-  Message* m = new Message(MESSAGE,
-    sequence_number,
-    my_id,
-    global_state[my_id]->deliveryAckList,
-    &failed_nodes,
-    global_timestamp,
-    string(message));
+  vector<pair<int, int> > acknowledgements;
+  for (
+      map<int, ExternalNodeState*>::iterator it = externalStates.begin();
+      it != externalStates.end();
+      it++) {
+
+    acknowledgements.push_back(make_pair<int, int>(
+      it->first, it->second->getLatestDeliveredSequenceNumber()
+    ));
+  }
+
+  //! Wrap the message in a Message object.
+  Message* m = new Message(
+    state.getId(),
+    state.getSequenceNumber(),
+    state.getTimestamp(),
+    MESSAGE,
+    string(message),
+    acknowledgements
+  );
 
   // Deliver to yourself first, so that if you fail before sending it to everyone, the message can still 
   // get re-transmitted by someone else without violating the R-multicast properties.
@@ -139,17 +102,21 @@ void multicast(const char *message) {
   }
 
   // Increment your own sent message sequence number.
-  sequence_number++;
+  state.sequenceNumberIncrement();
+}
 
-  pthread_mutex_unlock(&member_lock);
+void mcast_join(int member) {
+  printf("%d friggin joined.", member);
 }
 
 void receive(int source, const char *message, int len) {
   assert(message[len-1] == 0);
   assert(source != my_id);
 
+  NodeState& state = globalState->state;
+
   // Increment the timestamp before you do anything else.
-  timestamp_increment();
+  state.timestampIncrement();
 
   // De-serialize the message into a new Message object. 
   Message* m = new Message(string(message));

@@ -18,9 +18,6 @@ Message::Message(
       acknowledgements(acknowledgements),
       failedNodes(failedNodes),
       needsDelete(false) {
-
-  // TODO: The only reason this->timestamp isn't a reference is that
-  // we have a hard time initializing it in the other constructor.
   this->timestamp = new Timestamp(timestamp);
 }
 
@@ -35,7 +32,8 @@ Message::Message(const string& encoded) : needsDelete(true) {
   int offset = 0;
 
   // Type header
-  int typeSize = munchInteger(encoded, offset); assert(typeSize == 1);
+  int typeSize = munchInteger(encoded, offset);
+  assert(typeSize == 1);
   char type = encoded[offset++];
   switch (type) {
     case 'H':
@@ -52,7 +50,9 @@ Message::Message(const string& encoded) : needsDelete(true) {
   }
 
   // Sequence number
-  int senderIdSize = munchInteger(encoded, offset); assert(senderIdSize == 1);
+  int senderIdSize = munchInteger(encoded, offset);
+  cout << senderIdSize << "bubba"<< endl;
+  assert(senderIdSize == 1);
   senderId = munchInteger(encoded, offset);
   map<int,int> ts;
 

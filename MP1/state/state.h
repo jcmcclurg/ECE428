@@ -5,7 +5,6 @@
 #include "../timestamp/timestamp.h"
 
 #include <algorithm>
-#include <vector>
 #include <queue>
 #include <set>
 
@@ -21,7 +20,7 @@ class NodeState{
     int sequenceNumber;
 
     //! List of all messages sent by this node.
-    vector<Message*> messageStore;
+    set<Message*> messageStore;
 
     //! Set keeping track of all nodes this process believes to have failed.
     set<int> failedNodes;
@@ -30,10 +29,10 @@ class NodeState{
     Timestamp timestamp;
 
   public:
-    NodeState(int id, vector<int> ids) : id(id), timestamp(id, ids) {}
+    NodeState(int id, set<int> ids) : id(id), timestamp(id, ids) {}
     NodeState(int id, int* memberIds, int memberCount) : id(id), timestamp(id, memberIds, memberCount) {}
     ~NodeState(){
-      for (vector<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
+      for (set<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
         delete *it;
       }
     }
@@ -41,18 +40,18 @@ class NodeState{
     int getId() { return id; }
     int getSequenceNumber() { return sequenceNumber; }
     Timestamp& getTimestamp() { return timestamp; }
-    vector<Message*>& getMessageStore() { return messageStore; }
+    set<Message*>& getMessageStore() { return messageStore; }
     set<int>& getFailedNodes() { return failedNodes; }
 
     Message* getMessage(int sequenceNumber) {
-      for (vector<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
+      for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
         if((*it)->getSequenceNumber() == sequenceNumber) {
           return *it;
         }
       }
       return NULL;
     }
-    void storeMessage(Message* m) { messageStore.push_back(m); }
+    void storeMessage(Message* m) { messageStore.insert(m); }
 
     void updateFailedNodes(set<int>& otherFailedNodes) {
       failedNodes.insert(otherFailedNodes.begin(), otherFailedNodes.end());
@@ -76,7 +75,7 @@ class ExternalNodeState{
     int latestDeliveredSequenceNumber;
 
     //! List of all messages sent by this node.
-    vector<Message*> messageStore;
+    set<Message*> messageStore;
 
     //! Sequence number of the messages this node has delivered
     map<int, int> deliveryAckList;
@@ -86,7 +85,7 @@ class ExternalNodeState{
 
     int getId() const { return id; }
     int getLatestDeliveredSequenceNumber() const { return latestDeliveredSequenceNumber; }
-    vector<Message*> getMessageStore(){ return messageStore; }
+    set<Message*> getMessageStore(){ return messageStore; }
 
     /**
      * Increment the latest sequence number
@@ -96,24 +95,33 @@ class ExternalNodeState{
     }
 
     void updateDeliveryAckList(map<int,int> list){
+      #ifdef DEBUG
+      cout << "external state[" << id << "] deliveryAckList = {";
+      #endif
       for (
           map<int, int>::iterator it = list.begin();
           it != list.end();
           it++) {
 
         deliveryAckList[it->first] = max(deliveryAckList[it->first], it->second);
+        #ifdef DEBUG
+        cout << it->first << "=" << it->second << ",";
+        #endif
       }
+      #ifdef DEBUG
+      cout << "}" << endl; 
+      #endif
     }
 
     Message* getMessage(int sequenceNumber) {
-      for (vector<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
+      for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
         if((*it)->getSequenceNumber() == sequenceNumber) {
           return *it;
         }
       }
       return NULL;
     }
-    void storeMessage(Message* m) { messageStore.push_back(m); }
+    void storeMessage(Message* m) { messageStore.insert(m); }
 
     int getExternalLatestDeliveredSequenceNumber(int id) { return deliveryAckList[id]; }
 };

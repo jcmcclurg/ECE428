@@ -3,7 +3,7 @@
 
 #include <map>
 #include <string>
-#include <vector>
+#include <set>
 
 using namespace std;
 
@@ -13,11 +13,12 @@ class Timestamp {
   private:
     int ownId;
     map<int, int> timestamp;
+    map<int, int> diff;
 
   public:
     Timestamp(int id, int* memberIds, int memberCount);
     Timestamp(int id, map<int,int> timestampMap);
-    Timestamp(int id, vector<int> ids);
+    Timestamp(int id, set<int> ids);
 
     int getOwnId() const { return ownId; }
     map<int, int>& getTimestampMap() { return timestamp; } 
@@ -35,7 +36,7 @@ class Timestamp {
     /**
     * Updates the vector timestamp to include information from another timestamp.
     */
-    void update(Timestamp& t);
+    map<int,int>& update(Timestamp& t);
 };
 
 #endif

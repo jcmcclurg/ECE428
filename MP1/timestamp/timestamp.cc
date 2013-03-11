@@ -7,9 +7,9 @@ Timestamp::Timestamp(int id, int* memberIds, int memberCount){
   }
 }
 
-Timestamp::Timestamp(int id, vector<int> ids){
+Timestamp::Timestamp(int id, set<int> ids){
   ownId = id;
-  for (vector<int>::iterator it=ids.begin(); it != ids.end(); ++it){
+  for (set<int>::iterator it=ids.begin(); it != ids.end(); ++it){
     timestamp[*it] = 0;
   }
 }
@@ -51,10 +51,21 @@ CausalityRelation Timestamp::compare(Timestamp& t) const {
   }
 }
 
-void Timestamp::update(Timestamp& t){
+map<int,int>& Timestamp::update(Timestamp& t){
+  #ifdef DEBUG
+  cout << "updating timestamp[" << ownId << "]{";
+  #endif
   for (map<int, int>::iterator it=timestamp.begin(); it != timestamp.end(); ++it){
+    diff[it->first] = t.timestamp[it->first] - it->second;
     if(it->first != ownId && it->second < t.timestamp[it->first]){
       timestamp[it->first] = t.timestamp[it->first];
     }
+    #ifdef DEBUG
+    cout << it->first << "=" << it->second << "," << endl;
+    #endif
   }
+  #ifdef DEBUG
+  cout << "}" << endl;
+  #endif
+  return diff;
 }

@@ -31,4 +31,17 @@ class Message{
     string getEncodedMessage();
 };
 
+Message::operator<(Message param){
+  CausalityRelation r = timestamp.compare(param.timestamp);
+  if(r == CausalityRelation::BEFORE){
+    return true;
+  }
+  else if(r == CausalityRelation::AFTER){
+    return false;
+  }
+  else
+  {
+    return r.id < param.id;
+  }
+}
 #endif

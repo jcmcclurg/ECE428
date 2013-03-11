@@ -229,5 +229,4 @@ void receive(int source, const char *message, int len) {
   }
 
   timestamp_update();
-  deliver(source, message);
 }

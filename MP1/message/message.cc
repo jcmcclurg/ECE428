@@ -9,12 +9,14 @@ Message::Message(
     Timestamp& timestamp,
     MessageType type, 
     string message, 
-    vector<pair<int, int> > acknowledgements) :
+    map<int, int> acknowledgements,
+    vector<int> failNodes) :
       senderId(senderId), 
       sequenceNumber(sequenceNumber), 
       type(type), 
       message(message), 
       acknowledgements(acknowledgements),
+      failedNodes(failNodes),
       needsDelete(false) {
 
   // TODO: The only reason this->timestamp isn't a reference is that
@@ -65,7 +67,7 @@ Message::Message(const string& encoded) : needsDelete(true) {
   for (int i = 0; i < pairs; ++i) {
     int id = munchInteger(encoded, offset);
     int sequenceNumber = munchInteger(encoded, offset);
-    acknowledgements.push_back(make_pair<int, int>(id, sequenceNumber));
+    acknowledgements[id] = sequenceNumber;
   }
 
   // Timestamp
@@ -77,6 +79,13 @@ Message::Message(const string& encoded) : needsDelete(true) {
     ts[id] = count;
   }
   timestamp = new Timestamp(senderId,ts);
+
+  int failedNodesBytes = munchInteger(encoded, offset);
+  int values = failedNodesBytes / sizeof(int);
+  for (int i = 0; i < values; ++i) {
+    int id = munchInteger(encoded, offset);
+    failedNodes.push_back(id);
+  }
 }
 
 static void appendInteger(string& buffer, int val) {
@@ -86,7 +95,7 @@ static void appendInteger(string& buffer, int val) {
 
 //! Message format shown below. Each block is prefixed with a four byte length message.
 //! A bit overkill, but would be needed for any sort of platform independent representation.
-//! [message type][message (optional)][sender id][sequence number][acknowledgements][timestamp]
+//! [message type][message (optional)][sender id][sequence number][acknowledgements][timestamp][failedNodes]
 string Message::getEncodedMessage(){
   string result;
 
@@ -118,7 +127,7 @@ string Message::getEncodedMessage(){
   // Two integers (process ID and sequence number) per external node.
   int ackListBytes = acknowledgements.size() * 2 * sizeof(int);
   appendInteger(result, ackListBytes); // Block header!
-  for (vector<pair<int, int> >::iterator it = acknowledgements.begin(); 
+  for (map<int, int>::iterator it = acknowledgements.begin(); 
       it != acknowledgements.end(); 
       ++it) {
 
@@ -136,6 +145,17 @@ string Message::getEncodedMessage(){
 
     appendInteger(result, it->first);
     appendInteger(result, it->second);
+  }
+
+  // Failed nodes
+  int failedNodeBytes = failedNodes.size() * sizeof(int);
+  appendInteger(result, failedNodeBytes);
+  for (
+      int::iterator it = failedNodes.begin(); 
+      it != failedNodes.end(); 
+      ++it) {
+
+    appendInteger(result, it);
   }
 
   return result;

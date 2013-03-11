@@ -24,10 +24,10 @@ class Message{
     string message;
 
     // Acknowledgements
-    vector<pair<int, int> > acknowledgements;
+    map<int, int> acknowledgements;
 
-    // Not actually serialized. Used for message store bookkeeping.
-    set<int> undeliveredNodes;
+    // Indicates failed nodes
+    vector<int> failedNodes;
 
   public:   
     Message(
@@ -36,19 +36,20 @@ class Message{
         Timestamp& timestamp,
         MessageType type, 
         string message, 
-        vector<pair<int, int> > acknowledgements);
+        map<int, int> acknowledgements,
+        vector<int> failNodes);
     Message(const string& encoded);
     ~Message(){ if(needsDelete) delete timestamp; }
 
     int getSenderId() { return senderId; }
     int getSequenceNumber() { return sequenceNumber; }
-    Timestamp* getTimestamp() { return timestamp; }
+    Timestamp& getTimestamp() { return timestamp; }
     MessageType getType() { return type; }
     string getMessage() { return message; }
-    vector<pair<int, int> >& getAcknowledgements() { return acknowledgements; }
+    map<int, int>& getAcknowledgements() { return acknowledgements; }
 
     string getEncodedMessage();
-    set<int>& getUndeliveredNodes() { return undeliveredNodes; }
+    set<int>& getFailedNodes() { return undeliveredNodes; }
 };
 bool operator<(const Message& a, const Message& b);
 

@@ -12,8 +12,8 @@ timestamp.o: timestamp/timestamp.cc
 heartbeat.o: heartbeat/heartbeat.cc
 	g++ -g -c $^
 
-chat: $(SOURCEFILES) $(HEADERS) message.o timestamp.o
-	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o
+chat: $(SOURCEFILES) $(HEADERS) message.o timestamp.o heartbeat.o
+	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o heartbeat.o -lrt
 
 test: test.cc message.o timestamp.o heartbeat.o
 	g++ -g -pthread -o $@ test.cc message.o timestamp.o heartbeat.o -lrt

@@ -10,6 +10,7 @@
 
 using namespace std;
 
+#include "heartbeat/heartbeat.h"
 #include "message/message.h"
 #include "state/state.h"
 #include "timestamp/timestamp.h"
@@ -19,12 +20,23 @@ using namespace std;
 #define HEARTBEAT_SECONDS 10
 #define TIMEOUT_SECONDS 60
 
-//! The global state information
+//! The global state information and heartbeat detector.
 GlobalState* globalState;
+Heartbeat* heartbeat;
+
+void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
+  int id = si->si_value.sival_int;
+}
+
+void heartbeat_send() {
+  multicast("xoxo");
+}
 
 void multicast_init(void) {
   unicast_init();
   globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
+  heartbeat = new Heartbeat(mcast_members, mcast_num_members, 500, heartbeat_failure, heartbeat_send);
+  heartbeat.arm();
 }
 
 void multicast_deliver(int id, Message* m){
@@ -72,18 +84,23 @@ void multicast(const char *message) {
   multicast_deliver(my_id, m);
 
   // Add to the sent messages list so you can grab this message again in case a retransmission is needed.
-  add_to_message_store(m);
+  state.messageStore.push_back(m);
 
   // Unicast all the messages.
-  for (map<int,NodeState*>::iterator it=global_state.begin(); it != global_state.end(); ++it){
+  for (map<int, ExternalNodeState*>::iterator it = externalStates.begin(); it != externalStates.end(); ++it){
     // There's no need to send it to ourselves since we've already delivered the message.
-    if(it->first != my_id){
-      usend(it->first, m->getEncodedMessage(), m->getEncodedMessageLength());
+    if (it->first != my_id) {
+      string em = m->getEncodedMessage();
+      usend(it->first, em.c_str(), em.size());
     }
   }
 
   // Increment your own sent message sequence number.
   state.sequenceNumberIncrement();
+}
+
+void multicast(const char *message) {
+  multicast(message, MESSAGE);
 }
 
 void mcast_join(int member) {
@@ -95,6 +112,7 @@ void receive(int source, const char *message, int len) {
   assert(source != my_id);
 
   NodeState& state = globalState->state;
+  map<int, ExternalNodeState*> externalStates = globalState->externalStates;
 
   // Increment the timestamp before you do anything else.
   state.timestampIncrement();
@@ -103,13 +121,13 @@ void receive(int source, const char *message, int len) {
   Message* m = new Message(string(message));
 
   // Update our state based on receive information from node m->id.
-  update_global_timestamp(m->timestamp);
-  add_to_message_store(m);
+  state.timestampMerge(m->getTimestamp());
+  state.messageStore.push_back(m);
   update_message_store(m->id,m->deliveryAckList);
   update_failed_node_list(m->failed_nodes);
   reset_node_timeouts();
 
-  if(m->type == MessageType::RETRANSMISSION){
+  if (m->getType() == MessageType::RETRANSMISSION) {
     int from_id;
     int to_id;
     int seq_num;
@@ -117,19 +135,19 @@ void receive(int source, const char *message, int len) {
     Message* m = get_message_from_store(from_id,seq_num);
     unicast(to_id,m->getEncodedMessage(), m->getEncodedMessageLength());
   }
-  else if(m->type == MessageType::MESSAGE){
+  else if(m->getType() == MessageType::MESSAGE){
     // Have you already delivered this message?
-    if(m->sequenceNumber <= global_delivery_list(m->id) ){
+    ExternalNodeState& external = *externalStates[m->getId()];
+    if (m->getSequenceNumber() <= external->getLatestDeliveredSequenceNumber()) {
       discard(m);
-    }
-
+    } 
     // Have you already gotten this message?
-    else if(!in_holdback_queue(m)){
-      add_to_holdback_queue(m);
+    else if (!external.holdbackQueue.contains(m)) {
+      external.holdbackQueue.push(m);
 
       // Try to deliver some of the messages
       bool delivered=true;
-      while(delivered){
+      while(delivered) {
         delivered =false;
         vector<Message*> deliverables;
         for(each message a in holdback queue){
@@ -172,7 +190,7 @@ void receive(int source, const char *message, int len) {
       discard(m);
     }
   }
-  else{ // if(m->type == HEARTBEAT)
+  else { // if(m->type == HEARTBEAT)
     discard(m);
   }
 

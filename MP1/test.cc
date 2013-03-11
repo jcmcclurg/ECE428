@@ -2,6 +2,7 @@
 #include <string>
 #include <assert.h>
 
+#include "heartbeat/heartbeat.h"
 #include "state/state.h"
 #include "message/message.h"
 #include "timestamp/timestamp.h"
@@ -30,6 +31,24 @@ void testSerialize() {
   delete a;
 }
 
+void s() {
+  std::cout << "hey" << std::endl;
+}
+
+void f(int sig, siginfo_t *si, void *uc) {
+  std::cout << si->si_value.sival_int << std::endl;
+}
+
+void testHeartbeat() {
+  int ids[] = { 3, 4, 5 };
+  Heartbeat heartbeat(ids, 3, 500, f, s);
+  heartbeat.arm();
+  while(1) {
+    heartbeat.reset(3);
+  }
+}
+
 int main() {
   testSerialize();
+  //testHeartbeat();
 }

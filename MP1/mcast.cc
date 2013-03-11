@@ -22,25 +22,6 @@ using namespace std;
 //! The global state information
 GlobalState* globalState;
 
-/* Failure detection */
-pthread_t heartbeat_thread;
-
-void *heartbeat_thread_main(void *arg) {
-  timespec req;
-  req.tv_sec = 0;
-  req.tv_nsec = HEARTBEAT_SECONDS * 1000000L;
-  while(1) {
-    nanosleep(&req, NULL);
-  }
-}
-
-void heartbeat_init(void) {
-  if (pthread_create(&heartbeat_thread, NULL, &heartbeat_thread_main, NULL) != 0) {
-    fprintf(stderr, "Error creating heartbeat thread!\n");
-    exit(1);
-  }
-}
-
 void multicast_init(void) {
   unicast_init();
   globalState = new GlobalState(my_id, mcast_members, mcast_num_members);

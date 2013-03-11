@@ -21,7 +21,7 @@ Message::~Message() {
   delete timestamp;
 }
 
-int munchInteger(const string& buffer, int& offset) {
+static int munchInteger(const string& buffer, int& offset) {
   int i = *(reinterpret_cast<const int*>(buffer.c_str() + offset));
   offset += sizeof(int);
   return i;
@@ -73,11 +73,11 @@ Message::Message(const string& encoded) {
   for (int i = 0; i < values; ++i) {
     int id = munchInteger(encoded, offset);
     int count = munchInteger(encoded, offset);
-    timestamp[id] = count;
+    timestamp->getTimestamp()[id] = count;
   } 
 }
 
-void appendInteger(string& buffer, int val) {
+static void appendInteger(string& buffer, int val) {
   char* ca = reinterpret_cast<char*>(&val);
   buffer.append(ca, sizeof(int));
 }

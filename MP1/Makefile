@@ -9,11 +9,14 @@ message.o: message/message.cc
 timestamp.o: timestamp/timestamp.cc 
 	g++ -g -c $^
 
+heartbeat.o: heartbeat/heartbeat.cc
+	g++ -g -c $^
+
 chat: $(SOURCEFILES) $(HEADERS) message.o timestamp.o
 	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o
 
-test: test.cc message.o timestamp.o
-	g++ -g -pthread -o $@ test.cc message.o timestamp.o
+test: test.cc message.o timestamp.o heartbeat.o
+	g++ -g -pthread -o $@ test.cc message.o timestamp.o heartbeat.o -lrt
 
 clean:	restart
 	-rm -f chat test *.o *~

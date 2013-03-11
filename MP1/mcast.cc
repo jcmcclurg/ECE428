@@ -190,19 +190,8 @@ void receive(int source, const char *message, int len) {
     }
     // This sequence is next in line! Good to deliver.
     else if (m->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
-      multicast_deliver(*m);
-
-      // Maybe we can deliver some more messages before we're done.
-      for (
-          vector<Message*>::iterator it = externalState.getMessageStore().begin(); 
-          it != externalState.getMessageStore().end(); 
-          ++it) {
-
-        // Is this the message you are expecting?
-        if((*it)->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
-          multicast_deliver(*(*it));
-        }
-      }
+      // Even though we can deliver it according to FIFO order, we must store to ensure causal order.
+      externalState.storeMessage(m);
     } 
     // We're missing some messages...
     else {
@@ -255,6 +244,40 @@ void receive(int source, const char *message, int len) {
         }
       }
     }
+ 
+    bool deliveredSomething;
+    do{
+      deliveredSomething = false;
+      vector<Message*> deliverables;
+
+      // Construct a list of all the deliverable messages.
+      for(map<int,ExternalNodeState&>::iterator i = *externalStates.begin();
+          i != *externalStates.end();
+          ++i){
+        ExternalNodeState& extState = i->second;
+        int latestSeqNum = extState.getLatestDeliveredSequenceNumber();
+        for (
+            vector<Message*>::iterator it = extState.getMessageStore().begin(); 
+            it != extState.getMessageStore().end(); 
+            ++it) {
+
+          // Is this the message you are expecting?
+          if((*it)->getSequenceNumber() == latestSeqNum + 1) {
+            deliverables.push_back(*(*it));
+            deliveredSomething = true;
+          }
+        }
+      }
+
+      // Sort the list according to causal order, and deliver.
+      sort(deliverables.start(),deliverables.end());
+      for(vector<Message*>::iterator it = deliverables.begin(); 
+          it != deliverables.end(); 
+          ++it) {
+          multicast_deliver(*it);
+      }
+
+    } while(deliveredSomething);
   }
   else { // if(m->type == HEARTBEAT)
     discard(m);

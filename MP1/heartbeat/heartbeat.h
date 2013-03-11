@@ -12,7 +12,8 @@ struct Heartbeat {
   private:
     pthread_t sendThread;
 
-    struct itimerspec timerInterval;
+    long sendInterval;
+    struct itimerspec timerSpec;
     map<int, timer_t> listenTimers;
 
   public:   
@@ -21,12 +22,15 @@ struct Heartbeat {
     Heartbeat(
         int* memberIds, 
         int memberCount, 
-        int interval, 
+        long timeout,
+        long sendInterval,
         void (*failureHandler)(int, siginfo_t*, void *),
         void (*sendCallback)(void));
     
     void arm();
     void reset(int id);
+
+    long getSendInterval() { return sendInterval; }
 };
 
 #endif

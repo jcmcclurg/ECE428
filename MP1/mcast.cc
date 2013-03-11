@@ -18,8 +18,8 @@ using namespace std;
 #include "mp1.h"
 
 /* Defines */
-#define HEARTBEAT_SECONDS 10
-#define TIMEOUT_SECONDS 60
+#define HEARTBEAT_MS 10 * 1000L
+#define TIMEOUT_MS 60 * 1000L
 
 //! The global state information
 GlobalState* globalState;
@@ -43,7 +43,14 @@ static void heartbeat_send() {
 void multicast_init(void) {
   unicast_init();
   globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
-  heartbeat = new Heartbeat(mcast_members, mcast_num_members, 500, heartbeat_failure, heartbeat_send);
+  heartbeat = new Heartbeat(
+    mcast_members, 
+    mcast_num_members, 
+    TIMEOUT_MS, 
+    HEARTBEAT_MS, 
+    heartbeat_failure,
+    heartbeat_send
+  );
   heartbeat->arm();
 }
 

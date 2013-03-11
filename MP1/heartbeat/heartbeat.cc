@@ -5,12 +5,14 @@
 #include <stdlib.h>
 #include <iostream>
 
+static const int ONE_MILLION = 1000000L;
+
 static void* send_thread_main(void *arg) {
   Heartbeat* heartbeat = (Heartbeat*) arg;
 
   timespec req;
-  req.tv_sec = 0;
-  req.tv_nsec = 500000000L;
+  req.tv_sec = (heartbeat->getSendInterval() / 1000); 
+  req.tv_nsec = (heartbeat->getSendInterval() % 1000) * ONE_MILLION; 
   while(1) {
     nanosleep(&req, NULL);
     heartbeat->sendCallback();
@@ -21,15 +23,16 @@ static void* send_thread_main(void *arg) {
 Heartbeat::Heartbeat(
     int* memberIds,
     int memberCount,
-    int interval,
+    long timeout,
+    long sendInterval,
     void (*failureHandler)(int, siginfo_t*, void *), 
     void (*sendCallback)(void))
-    : sendCallback(sendCallback) {
+    : sendCallback(sendCallback), sendInterval(sendInterval) {
 
-  timerInterval.it_interval.tv_sec = 0; 
-  timerInterval.it_interval.tv_nsec = 500000000L;//1000000L * interval;
-  timerInterval.it_value.tv_sec = 0;
-  timerInterval.it_value.tv_nsec = 500000000L;//1000000L * interval;
+  timerSpec.it_interval.tv_sec = (timeout / 1000); 
+  timerSpec.it_interval.tv_nsec = (timeout % 1000) * ONE_MILLION;
+  timerSpec.it_value.tv_sec = (timeout / 1000);
+  timerSpec.it_value.tv_nsec = (timeout % 1000) * ONE_MILLION;
 
   if (pthread_create(&sendThread, NULL, &send_thread_main, (void*) this) != 0) {
     fprintf(stderr, "Error creating heartbeat send thread!\n");
@@ -71,7 +74,7 @@ void Heartbeat::arm() {
       it++) {
 
     timer_t timer = it->second;
-    if (timer_settime(timer, 0, &timerInterval, NULL) != 0) {
+    if (timer_settime(timer, 0, &timerSpec, NULL) != 0) {
       fprintf(stderr, "Error arming heartbeat listen timers!\n");
       exit(1);
     }
@@ -80,7 +83,7 @@ void Heartbeat::arm() {
 
 void Heartbeat::reset(int id) {
   timer_t timer = listenTimers[id];
-  if (timer_settime(timer, 0, &timerInterval, NULL) != 0) {
+  if (timer_settime(timer, 0, &timerSpec, NULL) != 0) {
     fprintf(stderr, "Error reseting heartbeat listen timers!\n");
     exit(1);
   }

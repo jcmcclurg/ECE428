@@ -12,8 +12,11 @@ timestamp.o: timestamp/timestamp.cc
 chat: $(SOURCEFILES) $(HEADERS) message.o timestamp.o
 	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o
 
+test: test.cc message.o timestamp.o
+	g++ -g -pthread -o $@ test.cc message.o timestamp.o
+
 clean:	restart
-	-rm -f chat *.o *~
+	-rm -f chat test *.o *~
 
 restart:
 	-rm -f GROUPLIST

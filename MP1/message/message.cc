@@ -22,18 +22,18 @@ Message::~Message() {
 }
 
 int munchInteger(const string& buffer, int& offset) {
-  int i = *(reinterpret_cast<int*>(buffer.c_str()[offset]));
+  int i = *(reinterpret_cast<const int*>(buffer.c_str() + offset));
   offset += sizeof(int);
   return i;
 }
+
 
 Message::Message(const string& encoded) {
   int offset = 0;
 
   // Type header
-  int typeSize = munchInteger(encoded, offset);
-  assert(typeSize == 1);
-  char type = encoded[offset];
+  int typeSize = munchInteger(encoded, offset); assert(typeSize == 1);
+  char type = encoded[offset++];
   switch (type) {
     case 'H':
       type = HEARTBEAT;
@@ -41,15 +41,15 @@ Message::Message(const string& encoded) {
     case 'R':
       type = RETRANSREQUEST;
       break;
-    case MESSAGE:
+    case 'M':
       type = MESSAGE;
       int messageSize = munchInteger(encoded, offset);
       message = string(encoded.c_str() + offset, messageSize);
+      offset += messageSize;
   }
 
   // Sequence number
-  int senderIdSize = munchInteger(encoded, offset);
-  assert(senderIdSize == 1);
+  int senderIdSize = munchInteger(encoded, offset); assert(senderIdSize == 1);
   senderId = munchInteger(encoded, offset);
   timestamp = new Timestamp(senderId);
 
@@ -100,7 +100,6 @@ string Message::getEncodedMessage(){
     case MESSAGE:
       result += 'M';
       appendInteger(result, message.size()); // Block header!
-      result += message.size();
       result += message;
   }
 
@@ -136,4 +135,6 @@ string Message::getEncodedMessage(){
     appendInteger(result, it->first);
     appendInteger(result, it->second);
   }
+
+  return result;
 }

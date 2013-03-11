@@ -38,8 +38,15 @@ class Message{
     Message(const string& encoded);
     ~Message();
 
+    int getSenderId() { return senderId; }
+    int getSequenceNumber() { return sequenceNumber; }
+    Timestamp* getTimestamp() { return timestamp; }
+    MessageType getType() { return type; }
     string getMessage() { return message; }
+    vector<pair<int, int> >& getAcknowledgements() { return acknowledgements; }
+
     string getEncodedMessage();
+    set<int>& getUndeliveredNodes() { return undeliveredNodes; }
 };
 
 #endif

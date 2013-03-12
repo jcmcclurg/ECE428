@@ -59,7 +59,7 @@ Message::Message(const char* encoded, int len) : needsDelete(true) {
     case 'M':
       type = MESSAGE;
       int messageSize = munchInteger(&encoded);
-      message = string(encoded, messageSize);
+      message = string(encoded, messageSize - 1);
       encoded += messageSize;
       break;
   }

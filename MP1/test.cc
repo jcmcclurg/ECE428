@@ -10,7 +10,7 @@
 #include "timestamp/timestamp.h"
 
 void testSerialize() {
-  vector<int> v;v.push_back(1);v.push_back(2);v.push_back(3);
+  set<int> v; v.insert(1); v.insert(2); v.insert(3);
   map<int, int> acknowledgements;
   set<int> failedNodes;
   acknowledgements[2] = 1;
@@ -27,18 +27,22 @@ void testSerialize() {
     failedNodes
   );
 
-  string str = a->getEncodedMessage();
-  Message b = Message(str);
+  char buf[1000];
+
+  int len = a->getEncodedMessage(buf);
+  Message b = Message(buf, len);
 
   assert(b.getSenderId() == state.getId());
   assert(b.getMessage() == "hey");
-  assert(acknowledgements.size() == 1);
+  assert(b.getTimestamp().getTimestampMap()[1] == 0);
+  assert(b.getAcknowledgements()[2] == 1);
+  assert(b.getFailedNodes().size() == 0);
 
   delete a;
 }
 
 void testMessage(){
-  vector<int> v;v.push_back(1);v.push_back(2);v.push_back(3);
+  set<int> v; v.insert(1); v.insert(2); v.insert(3);
   map<int, int> acknowledgements;
   set<int> failedNodes;
   acknowledgements[2] = 1;
@@ -94,5 +98,5 @@ void testHeartbeat() {
 int main() {
   testSerialize();
   testMessage();
-  testHeartbeat();
+  //testHeartbeat();
 }

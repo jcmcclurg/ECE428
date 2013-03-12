@@ -47,8 +47,9 @@ Message::Message(const char* encoded, int len) : needsDelete(true) {
   // Type header
   int typeSize = munchInteger(&encoded);
   assert(typeSize == 1);
-  char type = *encoded; encoded++;
-  switch (type) {
+  char tp = *encoded; encoded++;
+  assert(tp == 'H' || tp == 'R' || tp == 'M');
+  switch (tp) {
     case 'H':
       type = HEARTBEAT;
       break;
@@ -60,6 +61,7 @@ Message::Message(const char* encoded, int len) : needsDelete(true) {
       int messageSize = munchInteger(&encoded);
       message = string(encoded, messageSize);
       encoded += messageSize;
+      break;
   }
 
   // Sender ID
@@ -130,6 +132,7 @@ int Message::getEncodedMessage(char* result){
       appendInteger(&result, message.size()+1);
       memcpy(result, message.c_str(), message.size()+1);
       result += message.size()+1;
+      break;
   }
 
   // Sender ID

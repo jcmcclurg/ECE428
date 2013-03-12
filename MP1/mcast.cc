@@ -56,7 +56,7 @@ void multicast_init(void) {
 
 void multicast_deliver(Message& m){
   #ifdef DEBUG
-    cout << "delivering " << m << endl;
+    cout << "Delivering " << m << endl;
   #endif
   if (m.getSenderId() != globalState->state.getId()) {
     globalState->externalStates[m.getSenderId()]->latestDeliveredSequenceNumberIncrement();
@@ -164,6 +164,7 @@ void receive(int source, const char *message, int len) {
 
   // De-serialize the message into a new Message object. 
   Message* m = new Message(message, len);
+
   #ifdef DEBUG
   cout << "Received a ";
   if(m->getType() == RETRANSREQUEST){
@@ -173,7 +174,7 @@ void receive(int source, const char *message, int len) {
     cout << "message";
   }
   else{ // if(m->getType() == HEARTBEAT)
-    cout << "heartbeat";
+    cout << "heartbeat" << HEARTBEAT;
   }
   cout << " from " << source << " at " << m->getTimestamp() << endl;
   #endif
@@ -311,6 +312,7 @@ void receive(int source, const char *message, int len) {
     #endif
     bool deliveredSomething;
     do{
+cout<<"clock"<<endl;
       deliveredSomething = false;
       set<Message*> undelivered;
 
@@ -326,14 +328,19 @@ void receive(int source, const char *message, int len) {
         for(set<Message*>::iterator it = extState.getMessageStore().begin(); 
             it != extState.getMessageStore().end(); 
             ++it) {
-
+cout<<"click" << *it <<endl;
           // Has this message been delivered yet?
           if((*it)->getSequenceNumber() > latestSeqNum) {
             #ifdef DEBUG
-            cout << "Considering: " << *it << endl;
+            cout << "Undelivered: " << *(*it) << endl;
             #endif
             undelivered.insert(*it);
           }
+          #ifdef DEBUG
+          else{
+            cout << "Delivered: " << *(*it) << endl;
+          }
+          #endif
         }
       }
 

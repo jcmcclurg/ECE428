@@ -178,6 +178,18 @@ int Message::getEncodedMessage(char* result){
   return result - resultStart;
 }
 
+ostream& operator<<(ostream& strm, const Message& m){
+  strm << "Message{"
+       << m.senderId << ","
+       << m.sequenceNumber << ","
+       << m.timestamp << ","
+       << m.type << ","
+       << m.message << ","
+       << "acks,"
+       << "failedNodes"
+       << "}";
+  return strm;
+}
 bool operator<(const Message& a, const Message& b){
   CausalityRelation r = a.timestamp->compare(*(b.timestamp));
   if(r == BEFORE){

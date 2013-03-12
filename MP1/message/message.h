@@ -2,6 +2,7 @@
 #define MESSAGE_H_
 
 #include "../timestamp/timestamp.h"
+#include <iostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@ enum MessageType {HEARTBEAT, RETRANSREQUEST, MESSAGE};
 
 class Message{
   friend bool operator<(const Message& a, const Message& b);
+  friend ostream& operator<<(ostream& strm, const Message& m);
   private:
     // Process specific properties
     int senderId;

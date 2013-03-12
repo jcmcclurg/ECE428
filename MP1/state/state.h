@@ -29,40 +29,20 @@ class NodeState{
     Timestamp timestamp;
 
   public:
-    NodeState(int id, set<int> ids) : id(id), timestamp(id, ids) {}
-    NodeState(int id, int* memberIds, int memberCount) : id(id), timestamp(id, memberIds, memberCount) {}
-    ~NodeState(){
-      for (set<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
-        delete *it;
-      }
-    }
+    NodeState(int id, int* memberIds, int memberCount);
+    ~NodeState();
+    Message* getMessage(int sequenceNumber);
+    void updateFailedNodes(set<int>& otherFailedNodes);
 
+    NodeState(int id, set<int> ids) : id(id), timestamp(id, ids) {}
     int getId() { return id; }
     int getSequenceNumber() { return sequenceNumber; }
     Timestamp& getTimestamp() { return timestamp; }
     set<Message*>& getMessageStore() { return messageStore; }
     set<int>& getFailedNodes() { return failedNodes; }
-
-    Message* getMessage(int sequenceNumber) {
-      for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
-        if((*it)->getSequenceNumber() == sequenceNumber) {
-          return *it;
-        }
-      }
-      return NULL;
-    }
     void storeMessage(Message* m) { messageStore.insert(m); }
 
-    void updateFailedNodes(set<int>& otherFailedNodes) {
-      failedNodes.insert(otherFailedNodes.begin(), otherFailedNodes.end());
-    }
-
-    /**
-     * Increment the sequence number
-     */
-    void sequenceNumberIncrement() {
-      sequenceNumber++;
-    }
+    void sequenceNumberIncrement() { sequenceNumber++; }
 };
 
 // Represents data we need to know about other processes.
@@ -81,72 +61,25 @@ class ExternalNodeState{
     map<int, int> deliveryAckList;
 
   public:
-    ExternalNodeState(int id) : id(id) {}
+    void updateDeliveryAckList(map<int,int>& list);
+    Message* getMessage(int sequenceNumber);
 
+    ExternalNodeState(int id) : id(id) {}
     int getId() const { return id; }
     int getLatestDeliveredSequenceNumber() const { return latestDeliveredSequenceNumber; }
     set<Message*> getMessageStore(){ return messageStore; }
-
-    /**
-     * Increment the latest sequence number
-     */
-    void latestDeliveredSequenceNumberIncrement() {
-      latestDeliveredSequenceNumber++;
-    }
-
-    void updateDeliveryAckList(map<int,int> list){
-      #ifdef DEBUG
-      cout << "external state[" << id << "] deliveryAckList = {";
-      #endif
-      for (
-          map<int, int>::iterator it = list.begin();
-          it != list.end();
-          it++) {
-
-        deliveryAckList[it->first] = max(deliveryAckList[it->first], it->second);
-        #ifdef DEBUG
-        cout << it->first << "=" << it->second << ",";
-        #endif
-      }
-      #ifdef DEBUG
-      cout << "}" << endl; 
-      #endif
-    }
-
-    Message* getMessage(int sequenceNumber) {
-      for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
-        if((*it)->getSequenceNumber() == sequenceNumber) {
-          return *it;
-        }
-      }
-      return NULL;
-    }
-    void storeMessage(Message* m) { messageStore.insert(m); }
-
+    void latestDeliveredSequenceNumberIncrement() { latestDeliveredSequenceNumber++; }
     int getExternalLatestDeliveredSequenceNumber(int id) { return deliveryAckList[id]; }
+    void storeMessage(Message* m) { messageStore.insert(m); }
 };
 
 struct GlobalState {
+  public:
   NodeState state;
   map<int, ExternalNodeState*> externalStates;
 
-  GlobalState(int ownId, int* memberIds, int memberCount) : state(ownId, memberIds, memberCount) {
-    for (int i = 0; i < memberCount; ++i) {
-      if (memberIds[i] != ownId) {
-        externalStates[memberIds[i]] = new ExternalNodeState(memberIds[i]);
-      }
-    } 
-  }
-
-  ~GlobalState() {
-    for (
-        map<int, ExternalNodeState*>::iterator it = externalStates.begin();
-        it != externalStates.end();
-        it++) {
-
-      delete it->second;
-    }
-  }
+  GlobalState(int ownId, int* memberIds, int memberCount);
+  ~GlobalState();
 };
 
 #endif

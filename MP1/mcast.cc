@@ -18,8 +18,8 @@ using namespace std;
 #include "mp1.h"
 
 /* Defines */
-#define HEARTBEAT_MS 10 * 1000L
-#define TIMEOUT_MS 60 * 1000L
+#define HEARTBEAT_MS 60 * 1000L
+#define TIMEOUT_MS 240 * 1000L
 
 //! The global state information
 GlobalState* globalState;
@@ -134,7 +134,7 @@ void multicast(const char *message, MessageType type) {
   }
 
   // Increment your own sent message sequence number.
-  // state.sequenceNumberIncrement();
+  state.sequenceNumberIncrement();
 }
 
 void multicast(const char *message) {
@@ -164,13 +164,16 @@ void receive(int source, const char *message, int len) {
 
   // De-serialize the message into a new Message object. 
   Message* m = new Message(message, len);
+  #ifdef DEBUG
+  cout << "receive: " << *m << endl;
+  #endif
 
   // Update our state based on receive information from node m->id.
 
   // If a node's timestamp has increased, we know it was at least alive when this message
   // was sent.
   #ifdef DEBUG
-  cout << "receive: "; // update will print out another message.
+  cout << "receive: ";
   #endif
   map<int,int>& df = state.getTimestamp().update(m->getTimestamp());
   for(map<int,int>::iterator it = df.begin();
@@ -183,6 +186,9 @@ void receive(int source, const char *message, int len) {
     }
   }
 
+  #ifdef DEBUG
+  cout << "receive: ";
+  #endif
   externalStates[m->getSenderId()]->updateDeliveryAckList(m->getAcknowledgements());
   state.updateFailedNodes(m->getFailedNodes());
 

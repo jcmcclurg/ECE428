@@ -10,6 +10,7 @@ using namespace std;
 enum CausalityRelation {BEFORE, CONCURRENT, AFTER};
 
 class Timestamp {
+  friend ostream& operator<<(ostream& strm, const Timestamp& m);
   private:
     int ownId;
     map<int, int> timestamp;
@@ -17,8 +18,8 @@ class Timestamp {
 
   public:
     Timestamp(int id, int* memberIds, int memberCount);
-    Timestamp(int id, map<int,int> timestampMap);
-    Timestamp(int id, set<int> ids);
+    Timestamp(int id, map<int,int>& timestampMap);
+    Timestamp(int id, set<int>& ids);
 
     int getOwnId() const { return ownId; }
     map<int, int>& getTimestampMap() { return timestamp; } 

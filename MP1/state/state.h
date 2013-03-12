@@ -34,7 +34,7 @@ class NodeState{
     Message* getMessage(int sequenceNumber);
     void updateFailedNodes(set<int>& otherFailedNodes);
 
-    NodeState(int id, set<int> ids) : id(id), timestamp(id, ids) {}
+    NodeState(int id, set<int> ids) : id(id), sequenceNumber(0), timestamp(id, ids) {}
     int getId() { return id; }
     int getSequenceNumber() { return sequenceNumber; }
     Timestamp& getTimestamp() { return timestamp; }
@@ -64,7 +64,8 @@ class ExternalNodeState{
     void updateDeliveryAckList(map<int,int>& list);
     Message* getMessage(int sequenceNumber);
 
-    ExternalNodeState(int id) : id(id) {}
+    ExternalNodeState(int id) : id(id), latestDeliveredSequenceNumber(0) {}
+    ~ExternalNodeState();
     int getId() const { return id; }
     int getLatestDeliveredSequenceNumber() const { return latestDeliveredSequenceNumber; }
     set<Message*> getMessageStore(){ return messageStore; }

@@ -1,31 +1,35 @@
-all: chat
-
 SOURCEFILES = unicast.cc mcast.cc chat.cc
 HEADERS = mp1.h
+OFILES = operators.o message.o timestamp.o heartbeat.o state.o
+
+all: chat
+DEBUG=
+
+debugr: restart debug
+
+debug: chat
+DEBUG=-DDEBUG
 
 operators.o: operators.cc
-	g++ -g -c $^
+	g++ $(DEBUG) -g -c $^
 
 message.o: message/message.cc
-	g++ -g -c $^
+	g++ $(DEBUG) -g -c $^
 
 timestamp.o: timestamp/timestamp.cc 
-	g++ -g -c $^
+	g++ $(DEBUG) -g -c $^
 
 heartbeat.o: heartbeat/heartbeat.cc
-	g++ -g -c $^
+	g++ $(DEBUG) -g -c $^
 
 state.o: state/state.cc
-	g++ -g -c $^
+	g++ $(DEBUG) -g -c $^
 
-debug: $(SOURCEFILES) $(HEADERS) operators.h operators.o message.o timestamp.o heartbeat.o state.o
-	g++ -g -pthread -o $@ $(SOURCEFILES) -DDEBUG message.o timestamp.o heartbeat.o state.o -lrt
+chat: $(SOURCEFILES) $(HEADERS) $(OFILES)
+	g++ $(DEBUG) -g -pthread -o $@ $(SOURCEFILES) $(OFILES) -lrt
 
-chat: $(SOURCEFILES) $(HEADERS) state.o message.o timestamp.o heartbeat.o
-	g++ -g -pthread -o $@ $(SOURCEFILES) message.o timestamp.o heartbeat.o state.o -lrt
-
-test: test.cc message.o timestamp.o heartbeat.o state.o
-	g++ -g -pthread -o $@ test.cc message.o timestamp.o heartbeat.o state.o -lrt
+test: test.cc $(OFILES)
+	g++ $(DEBUG) -g -pthread -o $@ test.cc $(OFILES) -lrt
 
 clean:	restart
 	-rm -f chat test *.o *~

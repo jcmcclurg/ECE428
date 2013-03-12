@@ -11,6 +11,7 @@
 
 using namespace std;
 
+#include "operators.h"
 #include "heartbeat/heartbeat.h"
 #include "message/message.h"
 #include "state/state.h"
@@ -22,7 +23,7 @@ using namespace std;
 #define TIMEOUT_MS 240 * 1000L
 
 //! The global state information
-GlobalState* globalState;
+GlobalState* globalState = NULL;
 Heartbeat* heartbeat;
 char encodeBuffer[100];
 
@@ -51,9 +52,10 @@ void multicast_init(void) {
 }
 
 void multicast_deliver(Message& m){
-  if (m.getSenderId() == my_id) {
-    globalState->state.sequenceNumberIncrement();
-  } else {
+  #ifdef DEBUG
+    cout << "delivering " << m << endl;
+  #endif
+  if (m.getSenderId() != globalState->state.getId()) {
     globalState->externalStates[m.getSenderId()]->latestDeliveredSequenceNumberIncrement();
   }
   deliver(m.getSenderId(), m.getMessage().c_str());
@@ -63,6 +65,7 @@ static void populateAcknowledgements(
       map<int, int>& acknowledgements, 
       map<int, ExternalNodeState*>& externalStates) {
 
+  // Messages we have delivered from the other nodes.
   for (
       map<int, ExternalNodeState*>::iterator it = externalStates.begin();
       it != externalStates.end();
@@ -70,6 +73,8 @@ static void populateAcknowledgements(
 
     acknowledgements[it->first] = it->second->getLatestDeliveredSequenceNumber();
   }
+  // Messages we have delivered from ourselves.
+  acknowledgements[globalState->state.getId()] = globalState->state.getSequenceNumber();
 }
 
 void initIfNecessary(){
@@ -97,6 +102,10 @@ void multicast(const char *message, MessageType type) {
 
   // Increment the timestamp before you do anything else.
   state.getTimestamp().step();
+  state.sequenceNumberIncrement();
+  #ifdef DEBUG
+    cout << "Sending message " << state.getSequenceNumber() << " at time " << state.getTimestamp() << endl;
+  #endif
 
   map<int, int> acknowledgements;
   populateAcknowledgements(acknowledgements, externalStates);
@@ -114,6 +123,7 @@ void multicast(const char *message, MessageType type) {
 
   // Deliver to yourself first, so that if you fail before sending it to everyone, the message can still 
   // get re-transmitted by someone else without violating the R-multicast properties.
+  // multicast_deliver increments either our sequence number or the latest delivered seq number of external.
   if (type != HEARTBEAT) {
     multicast_deliver(*m);
 
@@ -132,9 +142,6 @@ void multicast(const char *message, MessageType type) {
       unicast(it->first, *m);
     }
   }
-
-  // Increment your own sent message sequence number.
-  state.sequenceNumberIncrement();
 }
 
 void multicast(const char *message) {
@@ -165,30 +172,34 @@ void receive(int source, const char *message, int len) {
   // De-serialize the message into a new Message object. 
   Message* m = new Message(message, len);
   #ifdef DEBUG
-  cout << "receive: " << *m << endl;
+  cout << "Received a ";
+  if(m->getType() == RETRANSREQUEST){
+    cout << "retransmission request";
+  }
+  else if(m->getType() == MESSAGE){
+    cout << "message";
+  }
+  else{ // if(m->getType() == HEARTBEAT)
+    cout << "heartbeat";
+  }
+  cout << " from " << source << " at " << m->getTimestamp() << endl;
   #endif
 
   // Update our state based on receive information from node m->id.
 
   // If a node's timestamp has increased, we know it was at least alive when this message
   // was sent.
-  #ifdef DEBUG
-  cout << "receive: ";
-  #endif
   map<int,int>& df = state.getTimestamp().update(m->getTimestamp());
   for(map<int,int>::iterator it = df.begin();
       it != df.end(); ++it){
     if(it->second > 0){
       heartbeat->reset(it->first);
       #ifdef DEBUG
-      cout << "receive: Reset timeout for " << it->first << endl;
+      cout << "Reset timeout for " << it->first << endl;
       #endif
     }
   }
 
-  #ifdef DEBUG
-  cout << "receive: ";
-  #endif
   externalStates[m->getSenderId()]->updateDeliveryAckList(m->getAcknowledgements());
   state.updateFailedNodes(m->getFailedNodes());
 
@@ -201,29 +212,27 @@ void receive(int source, const char *message, int len) {
     ss >> fromId;
 
     #ifdef DEBUG
-    cout << "receive: node " << toId << " wants message " << sequenceNumber << " from " << fromId << endl;
+    cout << "Node " << toId << " wants message " << sequenceNumber << " from " << fromId << ". Checking..." << endl;
     #endif
 
     Message* m = NULL;
-
-    // Are you asking for one of my messages?
+    // Are you asking for one of my messages or for someone else's?
     if (fromId == state.getId()) {
       m = state.getMessage(sequenceNumber);
     } else {
       m = externalStates[fromId]->getMessage(sequenceNumber);
     }
-    assert(m != NULL);
-
-    // Update acknowledgements and failed nodes with latest information.
-    map<int,int>& acks = m->getAcknowledgements();
-    for(map<int,int>::iterator it = acks.begin();
-        it != acks.end(); ++it){
-      acks[it->first] = externalStates[fromId]->getExternalLatestDeliveredSequenceNumber(it->first);
+    if(m != NULL){
+      unicast(toId,*m);
+      #ifdef DEBUG
+      cout << "Retransmitted " << *m << endl;
+      #endif
     }
-    m->getFailedNodes().insert(state.getFailedNodes().begin(),state.getFailedNodes().end());
-
-    unicast(toId,*m);
-    discard(m);
+    #ifdef DEBUG
+    else{
+      cout << "Couldn't find that message." << endl;
+    }
+    #endif
   }
   else if(m->getType() == MESSAGE) {
     ExternalNodeState& externalState = *externalStates[m->getSenderId()];
@@ -232,20 +241,23 @@ void receive(int source, const char *message, int len) {
     // Have you already delivered this message?
     if (m->getSequenceNumber() <= latestDeliveredSequenceNumber) {
       #ifdef DEBUG
-      cout << "receive: already got message " << m->getSequenceNumber() << " from " << m->getSenderId() << endl;
+      cout << "Already delivered message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Discarding." << endl;
       #endif
       discard(m);
     }
     // This sequence is next in line! Good to deliver.
     else if (m->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
       #ifdef DEBUG
-      cout << "receive: message " << m->getSequenceNumber() << " from " << m->getSenderId() << " ready to deliver." << endl;
+      cout << "Message " << m->getSequenceNumber() << " from " << m->getSenderId() << " ready to deliver." << endl;
       #endif
       // Even though we can deliver it according to FIFO order, we must store to ensure causal order.
       externalState.storeMessage(m);
     } 
     // We're missing some messages...
     else {
+      #ifdef DEBUG
+      cout << "Got message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Were expecting " << latestDeliveredSequenceNumber + 1 << "." << endl;
+      #endif
       // Have you already gotten this message?
       if(externalState.getMessage(m->getSequenceNumber()) == NULL) {
         // Store this message in the appropriate store.

@@ -1,4 +1,5 @@
 #include "message.h"
+#include "../operators.h"
 #include "../timestamp/timestamp.h"
 #include <assert.h>
 #include <string.h>
@@ -182,11 +183,11 @@ ostream& operator<<(ostream& strm, const Message& m){
   strm << "Message{"
        << m.senderId << ","
        << m.sequenceNumber << ","
-       << m.timestamp << ","
+       << *m.timestamp << ","
        << m.type << ","
        << m.message << ","
-       << "acks,"
-       << "failedNodes"
+       << m.acknowledgements << ","
+       << m.failedNodes
        << "}";
   return strm;
 }

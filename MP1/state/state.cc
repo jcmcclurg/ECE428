@@ -22,8 +22,22 @@ using namespace std;
       return NULL;
     }
 
+    void NodeState::storeMessage(Message* m) {
+      messageStore.insert(m);
+      #ifdef DEBUG
+        cout << "Storing message from "<< id << ": " << *m << endl;
+      #endif
+    }
+
     void NodeState::updateFailedNodes(set<int>& otherFailedNodes) {
       failedNodes.insert(otherFailedNodes.begin(), otherFailedNodes.end());
+    }
+
+    void ExternalNodeState::storeMessage(Message* m) {
+      messageStore.insert(m);
+      #ifdef DEBUG
+        cout << "Storing message from "<< id << ": " << *m << endl;
+      #endif
     }
 
     ExternalNodeState::~ExternalNodeState(){

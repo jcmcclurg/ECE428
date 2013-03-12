@@ -70,7 +70,7 @@ map<int,int>& Timestamp::update(Timestamp& t){
     }
     #ifdef DEBUG
     else{
-      cout << it->first << ":" << it->second << "->";
+      cout << it->first << "=" << it->second << " ";
     }
     #endif
   }

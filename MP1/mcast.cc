@@ -174,7 +174,7 @@ void receive(int source, const char *message, int len) {
     cout << "message";
   }
   else{ // if(m->getType() == HEARTBEAT)
-    cout << "heartbeat" << HEARTBEAT;
+    cout << "heartbeat";
   }
   cout << " from " << source << " at " << m->getTimestamp() << endl;
   #endif
@@ -312,7 +312,6 @@ void receive(int source, const char *message, int len) {
     #endif
     bool deliveredSomething;
     do{
-cout<<"clock"<<endl;
       deliveredSomething = false;
       set<Message*> undelivered;
 
@@ -325,16 +324,18 @@ cout<<"clock"<<endl;
           ++i){
         ExternalNodeState& extState = *(i->second);
         int latestSeqNum = extState.getLatestDeliveredSequenceNumber();
-        for(set<Message*>::iterator it = extState.getMessageStore().begin(); 
-            it != extState.getMessageStore().end(); 
+        set<Message*> store = extState.getMessageStore(); 
+
+        for(set<Message*>::iterator it = store.begin();
+            it != store.end(); 
             ++it) {
-cout<<"click" << *it <<endl;
           // Has this message been delivered yet?
           if((*it)->getSequenceNumber() > latestSeqNum) {
             #ifdef DEBUG
             cout << "Undelivered: " << *(*it) << endl;
             #endif
-            undelivered.insert(*it);
+            Message* t = *it;
+            undelivered.insert(t);
           }
           #ifdef DEBUG
           else{
@@ -344,33 +345,43 @@ cout<<"click" << *it <<endl;
         }
       }
 
-      // Sort the undelivered list according to causal order, and deliver.
-      #ifdef DEBUG
-      cout << "Sorting undelivered messages by causal order..." << endl;
-      #endif
-      vector<Message*> dv;
-      copy(undelivered.begin(),undelivered.end(), dv.begin());
-      sort(dv.begin(),dv.end());
-      Timestamp& lastTried = (*dv.begin())->getTimestamp();
-      for(vector<Message*>::iterator it = dv.begin(); 
-          it != dv.end(); 
-          ++it) {
+      if(undelivered.size() > 0){
+        // Sort the undelivered list according to causal order, and deliver.
+        #ifdef DEBUG
+        cout << "Sorting undelivered messages by causal order..." << endl;
+        #endif
+        vector<Message*> dv;
+        dv.resize(undelivered.size());
+        copy(undelivered.begin(),undelivered.end(), dv.begin());
+        sort(dv.begin(),dv.end());
+        Message* first = dv[0];
+        Timestamp& lastTried = first->getTimestamp();
+        for(vector<Message*>::iterator it = dv.begin(); 
+            it != dv.end(); 
+            ++it) {
 
-        // Deliver messages if you can.
-        if((*it)->getSequenceNumber() == (*externalStates[(*it)->getSenderId()]).getLatestDeliveredSequenceNumber() + 1){
-          deliveredSomething = true;
-          multicast_deliver(*(*it));
-          lastTried = (*it)->getTimestamp();
-        }
+          // Deliver messages if you can.
+          ExternalNodeState& extState = *(externalStates[(*it)->getSenderId()]);
+          if((*it)->getSequenceNumber() == extState.getLatestDeliveredSequenceNumber() + 1){
+            deliveredSomething = true;
+            multicast_deliver(*(*it));
+            lastTried = (*it)->getTimestamp();
+          }
 
-        // Stop delivering messages if doing so would violate causality.
-        else if((*it)->getTimestamp().compare(lastTried) == AFTER){
-          #ifdef DEBUG
-          cout << "Waiting to deliver " << *it << endl;
-          #endif
-          break;
+          // Stop delivering messages if doing so would violate causality.
+          else if((*it)->getTimestamp().compare(lastTried) == AFTER){
+            #ifdef DEBUG
+            cout << "Waiting to deliver " << *it << endl;
+            #endif
+            break;
+          }
         }
       }
+      #ifdef DEBUG
+      else{
+        cout << "No undelivered messages remaining." << endl;
+      }
+      #endif
     } while(deliveredSomething);
     #ifdef DEBUG
     cout << "Finished message delivery attempt." << endl << "Attempting to free up message store..." << endl;
@@ -380,12 +391,12 @@ cout<<"click" << *it <<endl;
     for(map<int,ExternalNodeState*>::iterator i = externalStates.begin();
         i != externalStates.end();
         ++i){
+      // Go through all this node's messages.
       ExternalNodeState& extState = *(i->second);
       int latestSeqNum = extState.getLatestDeliveredSequenceNumber();
-
-      // Go through all this node's messages.
-      for(set<Message*>::iterator it = extState.getMessageStore().begin(); 
-          it != extState.getMessageStore().end(); 
+      set<Message*> store = externalState.getMessageStore();
+      for(set<Message*>::iterator it = store.begin(); 
+          it != store.end(); 
           ++it) {
         bool deletable = false;
 
@@ -406,9 +417,9 @@ cout<<"click" << *it <<endl;
         // Are we able to delete this message from the store?
         if(deletable){
           #ifdef DEBUG
-          cout << "Deleting: " << *it << endl;
+          cout << "Deleting: " << *(*it) << endl;
           #endif
-          externalState.getMessageStore().erase(*it);
+          store.erase(*it);
           discard(*it);
         }
       }

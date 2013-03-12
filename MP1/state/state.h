@@ -40,7 +40,7 @@ class NodeState{
     Timestamp& getTimestamp() { return timestamp; }
     set<Message*>& getMessageStore() { return messageStore; }
     set<int>& getFailedNodes() { return failedNodes; }
-    void storeMessage(Message* m) { messageStore.insert(m); }
+    void storeMessage(Message* m);
 
     void sequenceNumberIncrement() { sequenceNumber++; }
 };
@@ -71,7 +71,7 @@ class ExternalNodeState{
     set<Message*> getMessageStore(){ return messageStore; }
     void latestDeliveredSequenceNumberIncrement() { latestDeliveredSequenceNumber++; }
     int getExternalLatestDeliveredSequenceNumber(int id) { return deliveryAckList[id]; }
-    void storeMessage(Message* m) { messageStore.insert(m); }
+    void storeMessage(Message* m);
 };
 
 struct GlobalState {

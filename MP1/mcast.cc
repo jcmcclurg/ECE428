@@ -24,6 +24,7 @@ using namespace std;
 //! The global state information
 GlobalState* globalState;
 Heartbeat* heartbeat;
+char encodeBuffer[100];
 
 //! Forward declaration for our multicast function.
 void multicast(const char *message, MessageType type);
@@ -35,6 +36,11 @@ static void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
 
 static void heartbeat_send() {
   multicast("xoxo", HEARTBEAT);
+}
+
+void unicast(int to, Message& m){
+  int sz = m.getEncodedMessage(encodeBuffer);
+  usend(to, encodeBuffer, sz);
 }
 
 /**
@@ -123,8 +129,7 @@ void multicast(const char *message, MessageType type) {
 
     // There's no need to send it to ourselves since we've already delivered the message.
     if(it->first != my_id) {
-      string em = m->getEncodedMessage();
-      usend(it->first, em.c_str(), em.size());
+      unicast(it->first, *m);
     }
   }
 
@@ -158,7 +163,7 @@ void receive(int source, const char *message, int len) {
   state.getTimestamp().step();
 
   // De-serialize the message into a new Message object. 
-  Message* m = new Message(string(message));
+  Message* m = new Message(message, len);
 
   // Update our state based on receive information from node m->id.
 
@@ -211,9 +216,7 @@ void receive(int source, const char *message, int len) {
     }
     m->getFailedNodes().insert(state.getFailedNodes().begin(),state.getFailedNodes().end());
 
-    string em = m->getEncodedMessage();
-    usend(toId, em.c_str(), em.size());
-
+    unicast(toId,*m);
     discard(m);
   }
   else if(m->getType() == MESSAGE) {
@@ -281,8 +284,7 @@ void receive(int source, const char *message, int len) {
         );
 
         for (set<int>::iterator it = nodes.begin(); it != nodes.end(); ++it) { 
-          string em = rm.getEncodedMessage();
-          usend(*it, em.c_str(), em.size());
+          unicast(*it, rm);
         }
       }
     }

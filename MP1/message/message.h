@@ -38,7 +38,7 @@ class Message{
         string message, 
         map<int, int>& acknowledgements,
         set<int>& failedNodes);
-    Message(const string& encoded);
+    Message(const char* encoded, int len);
     ~Message(){ if(needsDelete) delete timestamp; }
 
     int getSenderId() { return senderId; }
@@ -48,8 +48,8 @@ class Message{
     string getMessage() { return message; }
     map<int, int>& getAcknowledgements() { return acknowledgements; }
     set<int>& getFailedNodes() { return failedNodes; }
-
-    string getEncodedMessage();
+    int getEncodedMessageSize();
+    int getEncodedMessage(char* encodedMessage);
 };
 bool operator<(const Message& a, const Message& b);
 

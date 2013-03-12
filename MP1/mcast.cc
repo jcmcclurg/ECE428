@@ -1,34 +1,10 @@
-#include <string.h>
-#include <assert.h>
-#include <stdio.h>
-#include <map>
-#include <iostream>
-#include <set>
-#include <algorithm>
-#include <ctime>
-#include <stdlib.h>
-#include <sstream>
-
-using namespace std;
-
-#include "operators.h"
-#include "heartbeat/heartbeat.h"
-#include "message/message.h"
-#include "state/state.h"
-#include "timestamp/timestamp.h"
 #include "mp1.h"
-
-/* Defines */
-#define HEARTBEAT_MS 60 * 1000L
-#define TIMEOUT_MS 240 * 1000L
+#include "rmcast.h"
 
 //! The global state information
 GlobalState* globalState = NULL;
 Heartbeat* heartbeat;
 char encodeBuffer[100];
-
-//! Forward declaration for our multicast function.
-void multicast(const char *message, MessageType type);
 
 static void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
   int failedId = si->si_value.sival_int;
@@ -36,7 +12,34 @@ static void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
 }
 
 static void heartbeat_send() {
-  multicast("xoxo", HEARTBEAT);
+  NodeState& state = globalState->state;
+  map<int, ExternalNodeState*> externalStates = globalState->externalStates;
+
+  #ifdef DEBUG
+    cout << "Sending heartbeat at time " << state.getTimestamp() << endl;
+  #endif
+
+  map<int, int> acknowledgements;
+  populateAcknowledgements(acknowledgements, externalStates);
+
+  // Wrap the message in a Message object.
+  Message* m = new Message(
+    state.getId(),
+    state.getSequenceNumber(),
+    state.getTimestamp(),
+    HEARTBEAT,
+    string(),
+    acknowledgements,
+    state.getFailedNodes()
+  );
+
+  // Unicast all the messages.
+  for (
+      map<int, ExternalNodeState*>::iterator it = externalStates.begin();
+      it != externalStates.end();
+      it++) {
+      unicast(it->first, *m);
+  }
 }
 
 void unicast(int to, Message& m){
@@ -61,7 +64,7 @@ void multicast_deliver(Message& m){
   deliver(m.getSenderId(), m.getMessage().c_str());
 }
 
-static void populateAcknowledgements(
+void populateAcknowledgements(
       map<int, int>& acknowledgements, 
       map<int, ExternalNodeState*>& externalStates) {
 
@@ -94,7 +97,7 @@ void initIfNecessary(){
 /**
  * Reliable multicast implementation.
  */
-void multicast(const char *message, MessageType type) {
+void multicast(const char *message) {
   initIfNecessary();
 
   NodeState& state = globalState->state;
@@ -115,7 +118,7 @@ void multicast(const char *message, MessageType type) {
     state.getId(),
     state.getSequenceNumber(),
     state.getTimestamp(),
-    type,
+    MESSAGE,
     string(message),
     acknowledgements,
     state.getFailedNodes()
@@ -124,28 +127,18 @@ void multicast(const char *message, MessageType type) {
   // Deliver to yourself first, so that if you fail before sending it to everyone, the message can still 
   // get re-transmitted by someone else without violating the R-multicast properties.
   // multicast_deliver increments either our sequence number or the latest delivered seq number of external.
-  if (type != HEARTBEAT) {
-    multicast_deliver(*m);
+  multicast_deliver(*m);
 
-    // Add to the sent messages list so you can grab this message again in case a retransmission is needed.
-    state.storeMessage(m);
-  }
+  // Add to the sent messages list so you can grab this message again in case a retransmission is needed.
+  state.storeMessage(m);
 
   // Unicast all the messages.
   for (
       map<int, ExternalNodeState*>::iterator it = externalStates.begin();
       it != externalStates.end();
       it++) {
-
-    // There's no need to send it to ourselves since we've already delivered the message.
-    if(it->first != my_id) {
       unicast(it->first, *m);
-    }
   }
-}
-
-void multicast(const char *message) {
-  multicast(message, MESSAGE);
 }
 
 void mcast_join(int member) {
@@ -210,6 +203,7 @@ void receive(int source, const char *message, int len) {
 
     stringstream ss(m->getMessage());
     ss >> fromId;
+    discard(m);
 
     #ifdef DEBUG
     cout << "Node " << toId << " wants message " << sequenceNumber << " from " << fromId << ". Checking..." << endl;
@@ -239,12 +233,13 @@ void receive(int source, const char *message, int len) {
     int latestDeliveredSequenceNumber = externalState.getLatestDeliveredSequenceNumber();
 
     // Have you already delivered this message?
-    if (m->getSequenceNumber() <= latestDeliveredSequenceNumber) {
+    if (m->getSequenceNumber() <= latestDeliveredSequenceNumber || externalState.getMessage(m->getSequenceNumber()) != NULL) {
       #ifdef DEBUG
-      cout << "Already delivered message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Discarding." << endl;
+      cout << "Already received message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Discarding." << endl;
       #endif
       discard(m);
     }
+
     // This sequence is next in line! Good to deliver.
     else if (m->getSequenceNumber() == latestDeliveredSequenceNumber + 1) {
       #ifdef DEBUG
@@ -252,17 +247,15 @@ void receive(int source, const char *message, int len) {
       #endif
       // Even though we can deliver it according to FIFO order, we must store to ensure causal order.
       externalState.storeMessage(m);
-    } 
-    // We're missing some messages...
+    }
+
+    // We're missing some messages from this particular node.
     else {
       #ifdef DEBUG
-      cout << "Got message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Were expecting " << latestDeliveredSequenceNumber + 1 << "." << endl;
+      cout << "Got message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Was expecting " << latestDeliveredSequenceNumber + 1 << "." << endl;
       #endif
-      // Have you already gotten this message?
-      if(externalState.getMessage(m->getSequenceNumber()) == NULL) {
-        // Store this message in the appropriate store.
-        externalState.storeMessage(m);
-      }
+      // Store this message in the appropriate store.
+      externalState.storeMessage(m);
 
       // Calculate the delta in sequence numbers so we can request a retransmission.
       int delta = m->getSequenceNumber() - latestDeliveredSequenceNumber;
@@ -282,6 +275,7 @@ void receive(int source, const char *message, int len) {
           }
         }
 
+        // This should at least contain the original sender.
         assert(!nodes.empty());
 
         map<int, int> acknowledgements;
@@ -301,78 +295,122 @@ void receive(int source, const char *message, int len) {
           state.getFailedNodes()
         );
 
-        for (set<int>::iterator it = nodes.begin(); it != nodes.end(); ++it) { 
+        for (set<int>::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+          #ifdef DEBUG
+          cout << "Asking " << *it << " to retransmit message " << i << " from " << m->getSenderId() << endl;
+          #endif
           unicast(*it, rm);
         }
       }
     }
  
+
+
+    #ifdef DEBUG
+      cout << "Attempting to deliver messages..." << endl;
+    #endif
     bool deliveredSomething;
-    bool deletedSomething;
     do{
       deliveredSomething = false;
-      deletedSomething = true;
-      set<Message*> deliverables;
-      set<Message*> deletables;
+      set<Message*> undelivered;
 
-      // Construct a list of all the deliverable messages.
+      // Construct a list of all the undelivered messages. It is known that all
+      // undelivered messages are either concurrent with or happen-after delivered
+      // messages, so the delivered messages need not be considered during the
+      // causal ordering process.
       for(map<int,ExternalNodeState*>::iterator i = externalStates.begin();
           i != externalStates.end();
           ++i){
         ExternalNodeState& extState = *(i->second);
         int latestSeqNum = extState.getLatestDeliveredSequenceNumber();
-        for (
-            set<Message*>::iterator it = extState.getMessageStore().begin(); 
+        for(set<Message*>::iterator it = extState.getMessageStore().begin(); 
             it != extState.getMessageStore().end(); 
             ++it) {
 
-          // Is this the message you are expecting?
-          if((*it)->getSequenceNumber() == latestSeqNum + 1) {
-            deliverables.insert(*it);
-            deliveredSomething = true;
-          }
-
-          // Are we able to delete this message from the store?
-          // Is the sequence number less or equal to all the known externally and internally delivered sequence numbers?
-          bool deletable = false;
-          if((*it)->getSequenceNumber() <= state.getId()){
-            deletable = false;
-            for(map<int,ExternalNodeState*>::iterator j = externalStates.begin();
-                j != externalStates.end();
-                ++i){
-              if((*it)->getSequenceNumber() > j->second->getExternalLatestDeliveredSequenceNumber((*it)->getSenderId())){
-                deletable = false;
-                break;
-              }
-            }
-          }
-          if(deletable){
-            deletables.insert(*it);
+          // Has this message been delivered yet?
+          if((*it)->getSequenceNumber() > latestSeqNum) {
+            #ifdef DEBUG
+            cout << "Considering: " << *it << endl;
+            #endif
+            undelivered.insert(*it);
           }
         }
       }
 
-      // Sort the list according to causal order, and deliver.
+      // Sort the undelivered list according to causal order, and deliver.
+      #ifdef DEBUG
+      cout << "Sorting undelivered messages by causal order..." << endl;
+      #endif
       vector<Message*> dv;
-      copy(deliverables.begin(),deliverables.end(), dv.begin());
+      copy(undelivered.begin(),undelivered.end(), dv.begin());
       sort(dv.begin(),dv.end());
+      Timestamp& lastTried = (*dv.begin())->getTimestamp();
       for(vector<Message*>::iterator it = dv.begin(); 
           it != dv.end(); 
           ++it) {
-          multicast_deliver(*(*it));
-      }
 
-      // Delete some messages from the store if possible.
-      for(set<Message*>::iterator it = deletables.begin(); 
-          it != deletables.end(); 
-          ++it) {
-          externalState.getMessageStore().erase(*it);
-          discard(*it);
+        // Deliver messages if you can.
+        if((*it)->getSequenceNumber() == (*externalStates[(*it)->getSenderId()]).getLatestDeliveredSequenceNumber() + 1){
+          deliveredSomething = true;
+          multicast_deliver(*(*it));
+          lastTried = (*it)->getTimestamp();
+        }
+
+        // Stop delivering messages if doing so would violate causality.
+        else if((*it)->getTimestamp().compare(lastTried) == AFTER){
+          #ifdef DEBUG
+          cout << "Waiting to deliver " << *it << endl;
+          #endif
+          break;
+        }
       }
     } while(deliveredSomething);
+    #ifdef DEBUG
+    cout << "Finished message delivery attempt." << endl << "Attempting to free up message store..." << endl;
+    #endif
+
+    // Go through all the nodes.
+    for(map<int,ExternalNodeState*>::iterator i = externalStates.begin();
+        i != externalStates.end();
+        ++i){
+      ExternalNodeState& extState = *(i->second);
+      int latestSeqNum = extState.getLatestDeliveredSequenceNumber();
+
+      // Go through all this node's messages.
+      for(set<Message*>::iterator it = extState.getMessageStore().begin(); 
+          it != extState.getMessageStore().end(); 
+          ++it) {
+        bool deletable = false;
+
+        // Have we delivered this message?
+        if((*it)->getSequenceNumber() <= state.getId()){
+          deletable = true;
+          // Has everyone else delivered this message?
+          for(map<int,ExternalNodeState*>::iterator j = externalStates.begin();
+              j != externalStates.end();
+              ++j){
+            if((*it)->getSequenceNumber() > j->second->getExternalLatestDeliveredSequenceNumber((*it)->getSenderId())){
+              deletable = false;
+              break;
+            }
+          }
+        }
+
+        // Are we able to delete this message from the store?
+        if(deletable){
+          #ifdef DEBUG
+          cout << "Deleting: " << *it << endl;
+          #endif
+          externalState.getMessageStore().erase(*it);
+          discard(*it);
+        }
+      }
+    }
+    #ifdef DEBUG
+    cout << "Finished cleaning message store." << endl;
+    #endif
   }
   else { // if(m->type == HEARTBEAT)
     discard(m);
   }
-  deliver(source, message);
 }

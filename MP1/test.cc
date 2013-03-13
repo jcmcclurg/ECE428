@@ -15,7 +15,7 @@ void testSerialize() {
   set<int> failedNodes;
   acknowledgements[2] = 1;
 
-  NodeState state(1, v);
+  Node state(1, v);
 
   Message* a = new Message(
     state.getId(),

@@ -76,7 +76,6 @@ map<int,int>& Timestamp::update(Timestamp& t){
     }
     #endif
   }
-  timestamp[ownId]++;
   #ifdef DEBUG
   cout << "}" << endl;
   #endif

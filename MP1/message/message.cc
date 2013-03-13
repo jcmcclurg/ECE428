@@ -200,12 +200,9 @@ bool operator<(const Message& a, const Message& b){
   CausalityRelation r = a.timestamp->compare(*(b.timestamp));
   if(r == BEFORE){
     return true;
-  }
-  else if(r == AFTER){
+  } else if(r == AFTER){
     return false;
-  }
-  else
-  {
+  } else {
     return a.senderId < b.senderId;
   }
 }

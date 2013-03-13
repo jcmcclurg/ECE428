@@ -36,4 +36,7 @@ void multicast_deliver(Message& m);
 void initIfNecessary();
 void discard(Message* m);
 
+void processUndelivered();
+void cleanMessageStore();
+
 #endif

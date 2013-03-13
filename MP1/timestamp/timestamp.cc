@@ -20,10 +20,12 @@ Timestamp::Timestamp(int id, map<int,int>& timestampMap){
   ownId = id;
   timestamp = timestampMap;
 }
+
 ostream& operator<<(ostream& strm, const Timestamp& m){
   strm << "Timestamp{"<< m.timestamp <<"}";
   return strm;
 }
+
 void Timestamp::step(){
   timestamp[ownId]++;
 }
@@ -60,20 +62,21 @@ map<int,int>& Timestamp::update(Timestamp& t){
   #ifdef DEBUG
   cout << "Updating timestamp[" << ownId << "]{";
   #endif
-  for (map<int, int>::iterator it=timestamp.begin(); it != timestamp.end(); ++it){
+  for (map<int, int>::iterator it = timestamp.begin(); it != timestamp.end(); ++it){
     diff[it->first] = t.timestamp[it->first] - it->second;
-    if(it->first != ownId && it->second < t.timestamp[it->first]){
+    if (it->first != ownId && it->second < t.timestamp[it->first]){
       timestamp[it->first] = t.timestamp[it->first];
       #ifdef DEBUG
       cout << it->first << ":" << it->second << "->" << t.timestamp[it->first] << " ";
       #endif
     }
     #ifdef DEBUG
-    else{
+    else {
       cout << it->first << "=" << it->second << " ";
     }
     #endif
   }
+  timestamp[ownId]++;
   #ifdef DEBUG
   cout << "}" << endl;
   #endif

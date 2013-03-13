@@ -27,18 +27,57 @@ void testSerialize() {
     failedNodes
   );
 
+  Message* b = new Message(
+    state.getId(),
+    state.getSequenceNumber(),
+    state.getTimestamp(),
+    RETRANSREQUEST,
+    string("1"),
+    acknowledgements,
+    failedNodes
+  );
+
+  Message* c = new Message(
+    state.getId(),
+    state.getSequenceNumber(),
+    state.getTimestamp(),
+    HEARTBEAT,
+    string(),
+    acknowledgements,
+    failedNodes
+  );
+
   char buf[1000];
 
   int len = a->getEncodedMessage(buf);
-  Message b = Message(buf, len);
+  Message a1 = Message(buf, len);
 
-  assert(b.getSenderId() == state.getId());
-  assert(b.getMessage() == "hey");
-  assert(b.getTimestamp().getTimestampMap()[1] == 0);
-  assert(b.getAcknowledgements()[2] == 1);
-  assert(b.getFailedNodes().size() == 0);
+  assert(a1.getSenderId() == state.getId());
+  assert(a1.getMessage() == "hey");
+  assert(a1.getTimestamp().getTimestampMap()[1] == 0);
+  assert(a1.getAcknowledgements()[2] == 1);
+  assert(a1.getFailedNodes().size() == 0);
+
+  len = b->getEncodedMessage(buf);
+  Message b1 = Message(buf, len);
+
+  assert(b1.getSenderId() == state.getId());
+  assert(b1.getMessage() == "1");
+  assert(b1.getTimestamp().getTimestampMap()[1] == 0);
+  assert(b1.getAcknowledgements()[2] == 1);
+  assert(b1.getFailedNodes().size() == 0);
+
+  len = c->getEncodedMessage(buf);
+  Message c1 = Message(buf, len);
+
+  assert(c1.getSenderId() == state.getId());
+  assert(c1.getTimestamp().getTimestampMap()[1] == 0);
+  assert(c1.getAcknowledgements()[2] == 1);
+  assert(c1.getFailedNodes().size() == 0);
 
   delete a;
+  delete b;
+  delete c;
 }
 
 void testMessage(){

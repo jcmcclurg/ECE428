@@ -1,14 +1,15 @@
 SOURCEFILES = unicast.cc mcast.cc chat.cc
 HEADERS = mp1.h
 OFILES = operators.o message.o timestamp.o heartbeat.o state.o
+DEBUG =
 
 all: chat
-DEBUG=
+
 
 debugr: restart debug
 
 debug: chat
-DEBUG=-DDEBUG
+
 
 operators.o: operators.cc
 	g++ $(DEBUG) -g -c $^

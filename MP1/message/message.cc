@@ -20,18 +20,8 @@ Message::Message(
       acknowledgements(acknowledgements),
       failedNodes(failedNodes),
       needsDelete(false) {
-  this->timestamp = new Timestamp(timestamp);
-}
 
-int Message::getEncodedMessageSize(){
-   return
-      sizeof(char)                    // type
-    + sizeof(char)*(message.size()+1) // message
-    + sizeof(int)*2                   // seqNum
-    + sizeof(int)*2                   // sendId
-    + sizeof(int)*(1 + 2*acknowledgements.size())
-    + sizeof(int)*(1 + acknowledgements.size())
-    + sizeof(int)*(1 + failedNodes.size()-1);
+  this->timestamp = new Timestamp(timestamp);
 }
 
 static int munchInteger(const char** buffer) {
@@ -46,6 +36,7 @@ Message::Message(const char* encoded, int len) : needsDelete(true) {
 
   // Type header
   int typeSize = munchInteger(&encoded);
+  int messageSize;
   assert(typeSize == 1);
   char tp = *encoded; encoded++;
   assert(tp == 'H' || tp == 'R' || tp == 'M');
@@ -55,10 +46,15 @@ Message::Message(const char* encoded, int len) : needsDelete(true) {
       break;
     case 'R':
       type = RETRANSREQUEST;
+      // Note that this size includes the null terminator!
+      messageSize = munchInteger(&encoded);
+      message = string(encoded, messageSize - 1);
+      encoded += messageSize;
       break;
     case 'M':
       type = MESSAGE;
-      int messageSize = munchInteger(&encoded);
+      // Note that this size includes the null terminator!
+      messageSize = munchInteger(&encoded);
       message = string(encoded, messageSize - 1);
       encoded += messageSize;
       break;
@@ -117,21 +113,26 @@ int Message::getEncodedMessage(char* result){
 
   // Type header (and message)
   appendInteger(&result, 1); // Block header!
+  int messageSize;
   switch (type) {
     case HEARTBEAT:
       *result = 'H'; result++;
       break;
     case RETRANSREQUEST:
       *result = 'R'; result++;
-      appendInteger(&result, message.size());
-      memcpy(result, message.c_str(), message.size()+1);
-      result += message.size()+1;
+      // Note that this size includes the null terminator!
+      messageSize = message.size() + 1;
+      appendInteger(&result, messageSize);
+      memcpy(result, message.c_str(), messageSize);
+      result += messageSize;
       break;
     case MESSAGE:
       *result = 'M'; result++;
-      appendInteger(&result, message.size()+1);
-      memcpy(result, message.c_str(), message.size()+1);
-      result += message.size()+1;
+      // Note that this size includes the null terminator!
+      messageSize = message.size() + 1;
+      appendInteger(&result, messageSize);
+      memcpy(result, message.c_str(), messageSize);
+      result += messageSize;
       break;
   }
 
@@ -194,6 +195,7 @@ ostream& operator<<(ostream& strm, const Message& m){
        << "}";
   return strm;
 }
+
 bool operator<(const Message& a, const Message& b){
   CausalityRelation r = a.timestamp->compare(*(b.timestamp));
   if(r == BEFORE){

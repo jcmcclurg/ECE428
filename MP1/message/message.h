@@ -50,7 +50,6 @@ class Message{
     string getMessage() { return message; }
     map<int, int>& getAcknowledgements() { return acknowledgements; }
     set<int>& getFailedNodes() { return failedNodes; }
-    int getEncodedMessageSize();
     int getEncodedMessage(char* encodedMessage);
 };
 bool operator<(const Message& a, const Message& b);

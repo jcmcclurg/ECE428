@@ -142,8 +142,6 @@ void multicast(const char *message) {
 
     unicast(it->first, *m);
   }
-
-  //processUndelivered();
 }
 
 void mcast_join(int member) {
@@ -190,7 +188,7 @@ void processUndelivered() {
   }
 
   if (undelivered.size() > 0) {
-    // Sort the undelivered list according to causal order, and deliver.
+    // Sort the undelivered list according to causal order and deliver.
     #ifdef DEBUG
     cout << "Sorting undelivered messages by causal order..." << endl;
     #endif

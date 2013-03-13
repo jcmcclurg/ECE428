@@ -21,6 +21,7 @@ static void* send_thread_main(void *arg) {
 
 // Interval is in ms.
 Heartbeat::Heartbeat(
+    int id,
     int* memberIds,
     int memberCount,
     long timeout,
@@ -39,31 +40,34 @@ Heartbeat::Heartbeat(
     exit(1);
   }
 
-  for (int i = 0; i < memberCount; ++i) {    
-    // Set the timer callback
-    struct sigaction sa; 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO; 
-    sa.sa_sigaction = failureHandler;
-    
-    if (sigaction(SIGRTMAX, &sa, NULL) == -1) {
-      fprintf(stderr, "Error setting heartbeat listen signal callback!\n");
-      exit(1);
+  for (int i = 0; i < memberCount; ++i) {  
+    // Only set timers for external nodes.
+    if (id != memberIds[i]) {  
+      // Set the timer callback
+      struct sigaction sa; 
+      sigemptyset(&sa.sa_mask);
+      sa.sa_flags = SA_SIGINFO; 
+      sa.sa_sigaction = failureHandler;
+      
+      if (sigaction(SIGRTMAX, &sa, NULL) == -1) {
+        fprintf(stderr, "Error setting heartbeat listen signal callback!\n");
+        exit(1);
+      }
+
+      // Create heartbeat timers
+      timer_t timer;
+      sigevent sigev;
+
+      sigev.sigev_notify = SIGEV_SIGNAL;
+      sigev.sigev_signo = SIGRTMAX;
+      sigev.sigev_value.sival_int = memberIds[i];
+
+      if (timer_create(CLOCK_MONOTONIC, &sigev, &timer) == -1) {
+        fprintf(stderr, "Error creating heartbeat listen timer!\n");
+        exit(1);
+      }
+      listenTimers[memberIds[i]] = timer;
     }
-
-    // Create heartbeat timers
-    timer_t timer;
-    sigevent sigev;
-
-    sigev.sigev_notify = SIGEV_SIGNAL;
-    sigev.sigev_signo = SIGRTMAX;
-    sigev.sigev_value.sival_int = memberIds[i];
-
-    if (timer_create(CLOCK_MONOTONIC, &sigev, &timer) == -1) {
-      fprintf(stderr, "Error creating heartbeat listen timer!\n");
-      exit(1);
-    }
-    listenTimers[memberIds[i]] = timer;
   }
 }
 

@@ -23,8 +23,7 @@ using namespace std;
 #include "rmcast.h"
 
 /* Defines */
-#define HEARTBEAT_MS 60 * 1000L
-#define TIMEOUT_MS 240 * 1000L
+#define HEARTBEAT_MS 0.2 * 1000L
 
 void populateAcknowledgements(map<int, int>& acknowledgements);
 

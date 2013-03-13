@@ -8,6 +8,8 @@
 #include "state/state.h"
 #include "message/message.h"
 #include "timestamp/timestamp.h"
+#include "rmcast.h"
+#include "mp1.h"
 
 void testSerialize() {
   set<int> v; v.insert(1); v.insert(2); v.insert(3);
@@ -119,6 +121,7 @@ void testMessage(){
 
 void s() {
   std::cout << "hey" << std::endl;
+  
 }
 
 void f(int sig, siginfo_t *si, void *uc) {
@@ -127,7 +130,8 @@ void f(int sig, siginfo_t *si, void *uc) {
 
 void testHeartbeat() {
   int ids[] = { 3, 4, 5 };
-  Heartbeat heartbeat(ids, 3, 500, 2000, f, s);
+  std::cout << HEARTBEAT_MS << ":" << HEARTBEAT_MS + MAXDELAY / 1000L << std::endl;
+  Heartbeat heartbeat(ids, 3, HEARTBEAT_MS + MAXDELAY / 1000L, HEARTBEAT_MS, f, s);
   heartbeat.arm();
   while(1) {
     heartbeat.reset(3);
@@ -135,7 +139,7 @@ void testHeartbeat() {
 }
 
 int main() {
-  testSerialize();
-  testMessage();
-  //testHeartbeat();
+  //testSerialize();
+  //testMessage();
+  testHeartbeat();
 }

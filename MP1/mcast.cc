@@ -86,9 +86,10 @@ void initIfNecessary(){
   if(globalState == NULL){
     globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
     heartbeat = new Heartbeat(
+      my_id,
       mcast_members, 
       mcast_num_members, 
-      HEARTBEAT_MS + MAXDELAY, 
+      HEARTBEAT_MS + MAXDELAY / 1000L, 
       HEARTBEAT_MS, 
       heartbeat_failure,
       heartbeat_send

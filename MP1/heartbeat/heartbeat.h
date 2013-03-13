@@ -20,6 +20,7 @@ struct Heartbeat {
     void (*sendCallback)(void);
 
     Heartbeat(
+        int id,
         int* memberIds, 
         int memberCount, 
         long timeout,

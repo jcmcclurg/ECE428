@@ -1,4 +1,8 @@
-\documentclass[]{article}
+\documentclass[conference]{IEEEtran}
+\usepackage{enumitem}
+\SetLabelAlign{parright}{\parbox[t]{\labelwidth}{\raggedleft#1}}
+\setlist[description]{style=multiline,topsep=10pt,leftmargin=2cm, rightmargin=0.9cm,font=\normalfont, align=parright}
+
 \usepackage{amsmath}
 \usepackage{cancel}
 \usepackage{algorithm}
@@ -15,195 +19,172 @@
 \maketitle
 
 \begin{abstract}
-
+The reliable multicast protocol detailed by this document is a demonstration of several key distributed systems concepts. In particular, the concepts of ordering guarantees and failure detection are put into practice, along with the establishment of several liveness and safety properties of the system.
+The purpose of this document is twofold. Primarily, it contains a concise description of the reliable multicast (rmcast) protocol we have developed and serves to place the protocol on a strong theoretical basis by sketching proofs of the Causal Ordering, Reliable Multicast, and Failure Detection system properties the protocol seeks to guarantee. Secondly, it discusses details and limitations of the C++ protocol implementation submitted with the assignment.
 \end{abstract}
 
-\section{Introduction}
-\section{Methods}
-For by Algorithms~\ref{alg:send}, \ref{alg:rcv}, and \ref{alg:failure}, define the following variables: Multicast group $G^k$, own process identifier $p_{self}$, raw message $m$, sequence number $s$, message source $p_s$, message with meta information $m'$, along with current vector timestamp $T^k$, and delivery acknowledgment set $D^{k\times k}$, delivered message store $S^{k\times w}$, holdback queue $Q^{k \times z}$, last delivery vector timestamp $T_l^k$, and timeout list $L^k$ all indexed by $p \in G$.
- 
-\subsection{Proof of Causal Ordering}
-Prove: If $multicastSend(m)$ happens-before $multicastSend(m')$, and $m'$ delivered by correct process $p$, then for process $p$, $deliver(m)$ happens-before $deliver(m')$.
+\section{Protocol}
 
-For vector timestamps $T_1$ and $T_2$, it can be proved that $T_1 < T_2 \Rightarrow T_1$ happens-before $T_2$. By this reasoning, Algorithm~\ref{alg:rcv} ensures that the most recently delivered message was either sent before or was sent concurrently with each new message that is delivered.
+The protocol defines the following objects:
+\begin{description}
+\item[$p_i$] Identifier for process $i$.
+\item[$G$] Identifier list $G$ such that $p_i \in G \iff $ process $i \in $ multicast group.
+\item[$T_{G}$] Vector timestamp containing pairs $t_i \forall i=p_i \in G$, where $t_i$ is the timestamp of process $i$.
+\item[$D_{G,k}$] Vector acknowledgment list containing elements $a_i = n \forall i=p_i \in G$ where $n$ is such that $m_{n, i\to k}$ is the last message from process $i$ that process $k$ has delivered.
+\item[$m_{n,i \to j}$] Application message $n$ from process $i$, destined for process $j$.
+\item[$\heartsuit_{i \to j}$] Rmcast heartbeat message.
+\item[$\diamondsuit_{\{n,k\},i \to j}$] Rmcast retransmission request from process $i$ asking process $j$ for message $m_{n,k \to i}$.
+\item[$m_{n,i \to j}'$] Rmcast message containing $m_{n,i\to j}$, along with the timestamp $T_G$ and acknowledgment list $D_{G,k}$ of process $i$ at transmission time.
+\item[$M_j$] Message list $M_j$ such that $m_{n, i \to j}' \in M_j \forall i=p_i \in G \iff $ message $m_{n, i \to j}$ has been received and/or delivered by process $j$.
+\end{description}
+
+\begin{algorithm}
+\caption{Reliable multicast send.}
+\label{alg:send}
+\begin{algorithmic}[1]
+\Procedure{multicastSend}{$m_{n,self \to j} \forall j \in G$}
+\State increment($T_G$)
+\State deliver($m_{n,self \to self}$) \Comment Optimistically self-deliver.
+\State update($D_{G,self}$) 
+\State $m_{n,self \to self}' \leftarrow m_{n,self \to self}, T_G, D_{G,self}$
+\State $M_{self} \leftarrow m_{n,self \to self}'$
+
+\For{$p_i \neq p_{self} \in G$}
+	\State $m_{n,self \to i}' \leftarrow m_{n,self \to j}, T_G, D_{G,self}$
+    \Comment Encode multicast headers.
+	\State unicast($m_{n,self \to j}'$)
+\EndFor
+\State $n=n+1$ \Comment Increment sequence number.
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{Failure detect and heartbeat.}
+\label{alg:failure}
+\begin{algorithmic}[1]
+\Procedure{failureDetect}{resettable timer $T_i$ and heartbeat period $H_i$ for each $p_i \in G$.}
+\Repeat
+	\For{$p_i \neq p_{self} \in G$}
+		\If{$T_i$ has expired}
+			\Comment Declare process as failed.
+			\State removeFromGroup($p$,$G$)
+		\ElsIf{$H_i$ has elapsed}
+			\Comment Send heartbeat if needed.
+			\State $\heartsuit_{self \to i} \leftarrow D_{G,self}$
+			\State unicast($\heartsuit_{self \to i}$)
+		\EndIf
+	\EndFor
+\Until{end of program.}
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Proof of Causal Ordering}
+Prove: If multicastSend($m$) happens-before multicastSend($m'$), and $m'$ delivered by correct process $p$, then for process $p$, deliver($m$) happens-before deliver($m'$).
+
+For vector timestamps $T_1$ and $T_2$, it can be proved that $T_1 < T_2 \Rightarrow T_1$ happens-before $T_2$. This fact, and the fact that the delivery ordering of mutually-concurrent events is irrelevant is used to create the causalitySort function referred to on line 28 of Algorithm~\ref{alg:rcv}.
+
+The behavior of line 38 guarantees that deliverable messages which happened-after currently-undeliverable messages are not delivered.
 
 \subsection{Proof of Reliable Multicast}
 Prove the Integrity, Validity and Agreement properties of the reliable multicast algorithms.
 
 \subsubsection{Integrity}
-Prove: (a) Each message delivered at most once. (b) The process is a member of the message's multicast group, and (c) the message was sent by it's claimed sender.
+Prove: (a) Each message delivered at most once. (b) The sending process is a member of the message's multicast group, and (c) the message was sent by its claimed sender.
 
-(a) is easily proved by contradiction. Given that a message has been delivered once, assume that the same message is delivered a second time. Algorithm~\ref{alg:send} guarantees that the sequence numbers of both messages are the same. This implies that the acknowledgment list $D$ was not updated after the initial delivery, which is contradicted by Algorithm~\ref{alg:rcv}.
+(a) is proved by contradiction. Given that a message has been delivered once, assume that the same message is delivered a second time. Line 27 of Algorithm~\ref{alg:rcv} implies that the acknowledgment list $D_{G,self}$ was not updated after the initial delivery, which is contradicted by line 36 of the same algorithm.
 
-(b) is deferred to the underlying process communication protocol.
+(b) and (c) are ensured by assuming non-corrupting channel and unique process IDs. Each message is tagged with sender information, and the protocol ignores incoming messages whose sender is not in $G$. See line 12 of Algorithm~\ref{alg:rcv}.
 
-(c) is ensured by allowing processes other than the original sender to retransmit any delivered message (in case the original sender has failed).
 \subsubsection{Validity}
 Prove: Eventual delivery of all sent messages to own process.
 
-Deferred to underlying process communication protocol.
+See line 3 of Algorithm~\ref{alg:send}.
 
 \subsubsection{Agreement}
 Prove: If a message is delivered to one process, it is delivered to all.
 
-If a message is delivered to a process, Algorithm~\ref{alg:failure} guarantees that all correct processes are aware of this delivery within some finite time. Thus, all correct processes can eventually detect any missing messages.
+If a message is delivered to some process $p_i$, line 4 of Algorithm~\ref{alg:send} and line 36 of Algorithm~\ref{alg:rcv} guarantees that $D_{G,i}$ contains this information. Line 7 of Algorithm~\ref{alg:failure} indicates that this delivery information is eventually transmitted to each other process in $G$. If the information is not transmitted, the failure detection ensures removal of $p_i$ from $G$.
 
-Now, Algorithm~\ref{alg:rcv} requests retransmission of missing messages until it receives the needed messages.
-the property is proved, provided that the network does not selectively delay message retransmissions without bound while continuing to speedily deliver heartbeat messages.
+Now, all correct processes are guaranteed to have information about the deliveries of other processes within some finite time. Assuming periodic receipt of new chat messages, and reasonable reliability of channel, the retransmission behavior of lines 4 and 47 of Algorithm~\ref{alg:rcv} indicates a high probability that retransmission requests will eventually be made and serviced. This can be made into a hard guarantee through the use of additional timeouts, or by piggybacking retransmission requests onto heartbeat messages.
 
 \subsection{Proof of Failure Detection}
 Prove: Every failure is eventually detected.
 
 Given that process $p$ has failed, it will not send out heartbeats. Algorithm~\ref{alg:failure} guarantees that each process will detect this within a finite time. Because delays can be unbounded, there is no guarantee against false positives in the failure detection.
 
-
-\begin{algorithm}
-\caption{Failure detect thread.}
-\label{alg:failure}
-\begin{algorithmic}[1]
-\Procedure{failureDetectThread}{$G$, $p_{self}$, $Q$, $T$, $T_l$, $D$, $L$}
-\State
-\Repeat
-	\For{$p \neq p_{self} \in G$}
-		\If{$\text{time}() - L[p] \geq T_f$}
-			\Comment Declare process as failed.
-			\State removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)
-		\ElsIf{$\text{time}() - L[p_{self}] \geq T_h$}
-			\Comment Send heartbeat if needed.
-			\State $m'$ = piggyback($T$, 0, $D[p_{self}]$, $p$, $\heartsuit$)
-			\State unicast($p$,$m'$)
-		\EndIf
-	\EndFor
-	\State $t$ = $T_h - (\text{time}() - L[p_{self}])$
-	\State sleep(min($t$,0))
-\Until{end of program.}
-\EndProcedure
- \Comment Updates $G$,$Q$,$T$,$T_l$, and $D$
-\end{algorithmic}
-\end{algorithm}
-
-
-
-\begin{algorithm}
-\caption{Reliable multicast send.}
-\label{alg:send}
-\begin{algorithmic}[1]
-\Procedure{multicastSend}{$G$, $p_{self}$, $m$, $s$, $T$, $D$}
-
-\For{$p \neq p_{self} \in G$}
-	\State incrementTimestamp($p_{self}$,$T$)
-	\State $m'$ = piggyback($T$, $s$, $D[p_{self}]$, $p$, $m$)
-	\State unicast($p$,$m'$)
-\EndFor
-\State incrementSequenceNumber($s$)
-\EndProcedure
-\Comment Updates $s$, and $S$.
-\end{algorithmic}
-\end{algorithm}
-
 \begin{algorithm}
 \caption{Reliable multicast receive}
 \label{alg:rcv}
 \begin{algorithmic}[1]
-\Procedure{multicastRcv}{$G$,$D$,$T$, $p_{self}$, $p_s$, $m'$, $S$, $Q$, $T_l$, $L$}
-% Get the meta information from the message
-\State \{$T_m$, $s$, $D[p_s]$, $p_{from}$, $m$\} = unpiggyback($m'$);
-
-\State mergeTimestamps($T$,$T_m$) \Comment Ensure consistency of timestamps.
-\State $L[p_s]$ = time() \Comment Reset timeout counter for $p_s$.
-
-\State \Comment Ensure consistency of group membership.
-\For{$p \in D[p_s]$ s.t. $p \not\in D$}
-	\State removeFromGroup($p$,$G$,$Q$,$T$,$T_l$,$D$)
-\EndFor
-
-\State \Comment Delete messages known to be delivered to everyone.
-\For{$l \in S[p] \forall p \in G$ s.t. $l.s \leq \text{min}(D[p])$}
-	\State removeFromMsgStore($l$,$S$)
-\EndFor
-
-\If{$m == \Xi$}
-	\Comment This is a retransmission request message.
-	\State discard($m$)
-	
-	\For{$l \in S[p_{from}]$ s.t. $l.s \leq s$}
-		\State $m'$ = piggyback($T$, $l.s$, $D$, $p_{from}$, $l.m$)
-		\State unicast($p_s$,$m'$)
-	\EndFor
-\ElsIf{$m == \heartsuit$}
-	\Comment This is a heartbeat message.
-	\State discard($m$)
-\Else
-	\Comment This is a regular message.
-	\State $p_s$ = $p_{from}$ \Comment Rewrite $p_s$ in case of retransmission.
-	\If{$s$ == $D[p_s] + 1$}
-		\State incrementTimestamp($p_{self}$,$T$)
-		
-		\If{$T_l \not> q.T$}
-			\Comment Ensure causality of new message delivery.
-			\State deliver($m$)
-			\State $T_l$ = $T_m$
-			\State $D[p_s]$ = $s$
-			\State $l.m$ = $m$
-			\State $l.s$ = $s$
-			\State addToMsgStore($l$,$S[p_s]$)
-		\Else
-			\State $q.m$ = $m$
-			\State $q.s$ = $s$
-			\State $q.T$ = $T_m$
-			\State addToQ($q$,$Q[p_s]$)
-		\EndIf
-		\algstore{myalg}
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}
-\ContinuedFloat
-\caption{Reliable multicast receive (continued)}
-\begin{algorithmic}
-		\algrestore{myalg}
-		\Repeat
-			\Comment Attempt to deliver items in queue.
-			\For{$q \in Q[p] \forall p \in G$ s.t. $q.s$ == $D[p_s] + 1$ and $T_l \not> q.T$}
-				\State deliver($q.m$)
-				\State $T_l$ = $q.T$
-				\State $D[p_s]$ = $q.s$
-				\State removeFromQ($Q$,$q$)
-				\State $l.m$ = $q.m$
-				\State $l.s$ = $s$
-				\State addToMsgStore($l$,$S[p]$)
-			\EndFor
-		\Until{$Q$ unchanged.}
-		
-	\ElsIf{$s > D[p_s] + 1$}
-		\Comment Message arrived out of order.
-		\State incrementTimestamp($p_{self}$,$T$)
-		\State $q.m$ = $m$
-		\State $q.s$ = $s$
-		\State $q.T$ = $T_m$
-		\State addToQ($q$,$Q[p_s]$)
-	\Else
-		\Comment Message already delivered.
-		\State discard($m$)
+\State \Comment Retransmission request.
+\Procedure{multicastRcv}{$\diamondsuit_{\{n,k\},i \to self}$}
+	\If{$m_{n,k\to i} \in M_{self}$}
+	\State unicast($m_{n,k\to i}$)
 	\EndIf
-\EndIf
-
-\State \Comment Ask someone to re-transmit the messages that we don't have.
-\For{$s' > D[p_{self}][p] \neq q.s \forall q \in Q[p], p \in G$}
-		\If{$\exists s'' \geq s' \in D[p']$ for some $p_{self} \in G$}
-			\State $m'$ = piggyback($T$, $s''$, $D[p_{self}]$, $p$, $\Xi$);
-			\State unicast($p_s$,$m'$)
-			\Comment Ask $p'$ to send us the message it got from $p$.
-		\EndIf
-\EndFor
-\If{unable to find anyone from which to request missing messages}
-	\State die()
-\EndIf
 \EndProcedure
-\Comment Updates $G$,$Q$,$T$,$T_l$, and $D$.
+
+\State
+\Procedure{multicastRcv}{$\heartsuit_{i \to self}$} \Comment Heartbeat.
+   \State resetTimeout($p_i$)
+   \EndProcedure
+\State \Comment Application message.
+
+\Procedure{multicastRcv}{$m_{n,i \to self}'$ s.t. $p_i \in G$} 
+\State increment($T_G$)
+\State $m_{n,i \to self}, T_{G'}, D_{G',i} \leftarrow m_{n,i \to self}'$
+\State merge($T_G$,$T_{G'}$)
+\State \Comment Fail if someone else thinks you are failed, or if you have already delivered messages from the node they think has failed.
+\For{$p_j \in G$ s.t. $p_j \not\in G'$}
+	\State markSuspectedFailure($p_j$)
+	\If{$p_j = p_{self}$ or
+	 \State $a_{j,self} \in D_{G,self} > a_{j,i} \in D_{G',i} $}
+	\State quit();
+	\EndIf
+\EndFor
+
+\State  \Comment Store message. Disallow duplicates.
+\State $M_{self} \leftarrow m_{n,i \to self}'$
+
+\State \Comment Find deliverable messages.
+\State $Q \leftarrow m_{k,j \to self}' \in M_{self}$ s.t. $k = a_j+1, a_j \in D_{G,self}$
+
+\State causalitySort($M_{self}$) \Comment Sort according to causality.
+\For{$m_x \in M_{self}$}
+	\If{$m_x \in Q$}
+		\State $m_{k,j \to self} \leftarrow  m_x$
+		\State \Comment Only deliver messages from suspected
+						failure nodes if doing so is needed
+						to ensure agreement.
+		\If{notIsSuspectedFailure($p_k$) \State or $\exists a_j \in \cup_{t \in G} D_{G^*,t}$}
+		\State deliver($m_{k,j \to self}$);
+		\State update($D_{G,self}$) 
+		\EndIf
+	\ElsIf{$m_x$ happens-after $m_{x-1}$}
+		\State break
+	\EndIf
+\EndFor
+
+\State \Comment Send retransmission requests to everyone who has delivered the messages we are waiting for.
+\For{$m_{q,j \to self} \not\in M_{self}$ s.t.
+\State $\exists $ undeliverable $m_{q',j \to self} \in M_{self}$}
+\For{$a_k \in \cup_{t \in G} D_{G^*,t}$ s.t. process $k$
+\State has delivered $m_x$}
+\State unicast($\diamondsuit_{\{q,k\},self \to j}$)
+\EndFor
+\EndFor
+\State \Comment Remove from $M_{self}$, the messages which are known to be delivered by everyone. This is determined by considering each $D_{G^*,t} \forall t \in G$.
+\State cleanup($M_{self}$)
+\EndProcedure
 \end{algorithmic}
 \end{algorithm}
 
-\section{Conclusion}
+\section{Implementation}
+As is suggested by line 17 of Algorithm~\ref{alg:rcv}, the C++ implementation does not currently support additions to group membership. However, the manner in which failures are communicated (namely, by transmitting a failed nodes list in the message header) allows this restriction to be relaxed in future revisions.
+
+Rather than storing all messages in a single message store $M_{self}$, the C++ implementation maintains its own message list and each list of messages received from other nodes separately. $D_{G,self}$ is not implemented as a single object, but the information contained is distributed across the same distinct global state structures that contain the stored messages. Each $D_{G*,j}, j \in G$, however is implemented as a single structure.
+
+Also, different from what is shown here, the same header information is placed into heartbeats and receive request as is placed into message headers, and timeout is reset with the receipt of any message. This aids the speed of communication and helps prevent unnecessary timeouts. The message headers are encoded to and decoded from a simple binary format, which conserves channel bandwidth.
 
 \end{document}

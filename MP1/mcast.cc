@@ -3,15 +3,16 @@
 
 //! The global state information
 GlobalState* globalState = NULL;
-Heartbeat* heartbeat;
-
+Heartbeat* heartbeat = NULL;
 char encodeBuffer[1000];
 
+//! A signal handler to call upon detecting a failure from some process.
 static void heartbeat_failure(int sig, siginfo_t *si, void *uc) {
   int failedId = si->si_value.sival_int;
   globalState->node.getFailedNodes().insert(failedId);
 }
 
+//! A callback to call everytime we want to send out a new heartbeat.
 static void heartbeat_send() {
   Node& node = globalState->node;
   map<int, ExternalNode*>& externalNodes = globalState->externalNodes;
@@ -43,6 +44,11 @@ static void heartbeat_send() {
   }
 }
 
+//! Unicasts a message to the desired process. Does not send messages
+//! to processes we suspect are failed.
+//!
+//! @param to The ID of the process we want to message.
+//! @param m The message we are sending.
 void unicast(int to, Message& m) {
   Node& node = globalState->node;
   if (node.getFailedNodes().find(to) == node.getFailedNodes().end()) {
@@ -51,13 +57,14 @@ void unicast(int to, Message& m) {
   }
 }
 
-/**
- * IMPORTANT: Assumes that the group membership will not grow during runtime.
- */
+// IMPORTANT: Assumes that the group membership will not grow during runtime.
 void multicast_init(void) {
   unicast_init();
 }
 
+//! Delivers a message. Will increment the sequence number if necessary.
+//!
+//! @param m The message we are delivering.
 void multicast_deliver(Message& m){
   #ifdef DEBUG
   cout << "Delivering " << m << endl;
@@ -68,6 +75,9 @@ void multicast_deliver(Message& m){
   deliver(m.getSenderId(), m.getMessage().c_str());
 }
 
+//! Iterates over the external nodes and populates the given acknowledgements map.
+//!
+//! @param acknowledgements The map we are populating.
 void populateAcknowledgements(map<int, int>& acknowledgements) {
   map<int, ExternalNode*>& externalNodes = globalState->externalNodes;
 
@@ -82,8 +92,9 @@ void populateAcknowledgements(map<int, int>& acknowledgements) {
   acknowledgements[globalState->node.getId()] = globalState->node.getSequenceNumber();
 }
 
-void initIfNecessary(){
-  if(globalState == NULL){
+//! Will allocate and initialize the global state. 
+void initIfNecessary() {
+  if(globalState == NULL) {
     globalState = new GlobalState(my_id, mcast_members, mcast_num_members);
     heartbeat = new Heartbeat(
       my_id,
@@ -97,9 +108,10 @@ void initIfNecessary(){
     heartbeat->arm();
   }
 }
-/**
- * Reliable multicast implementation.
- */
+
+//! Reliable multicast implementation
+//!
+//! @param message A character array containing the message we want to multicast.
 void multicast(const char *message) {
   initIfNecessary();
 
@@ -144,22 +156,28 @@ void multicast(const char *message) {
   }
 }
 
+//! Called when a new member joins
+//!
+//! @param member The process ID of the member that just joined.
 void mcast_join(int member) {
   #ifdef DEBUG
   cout << "Member " << member << " joined" << endl;
   #endif
 }
 
+//! Discards a message.
+//!
+//! @param m The message we want to discard.
 void discard(Message* m) {
-  // Free up some memory or something?
   delete m;
 }
 
+//! Construct a list of all the undelivered messages and decides whether or not
+//! they can be delivered. It is known that all undelivered messages are
+//! either concurrent with or happen-after delivered
+//! messages, so the delivered messages need not be considered during the
+//! causal ordering process.
 void processUndelivered() {
-  // Construct a list of all the undelivered messages. It is known that all
-  // undelivered messages are either concurrent with or happen-after delivered
-  // messages, so the delivered messages need not be considered during the
-  // causal ordering process.
   set<Message*>& store = globalState->messageStore; 
   vector<Message*> undelivered;
 
@@ -214,6 +232,7 @@ void processUndelivered() {
   #endif
 }
 
+//! Tries to clean the message store of messages we know that everyone has delivered.
 void cleanMessageStore() {
   map<int, ExternalNode*>& externalNodes = globalState->externalNodes;
   set<Message*>& store = globalState->messageStore; 
@@ -266,6 +285,7 @@ void cleanMessageStore() {
   #endif
 }
 
+//! Receives a message.
 void receive(int source, const char *message, int len) {
   initIfNecessary();
   assert(source != my_id);

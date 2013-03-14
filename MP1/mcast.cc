@@ -89,7 +89,7 @@ void initIfNecessary(){
       my_id,
       mcast_members, 
       mcast_num_members, 
-      HEARTBEAT_MS + MAXDELAY / 1000L, 
+      HEARTBEAT_MS + MAXDELAY, 
       HEARTBEAT_MS, 
       heartbeat_failure,
       heartbeat_send
@@ -157,63 +157,56 @@ void discard(Message* m) {
   delete m;
 }
 
-void processUndelivered() {
-  // Construct a list of all the undelivered messages. It is known that all
-  // undelivered messages are either concurrent with or happen-after delivered
-  // messages, so the delivered messages need not be considered during the
-  // causal ordering process.
+void retransmissionRequests(Message* m, int lastSequenceNumber){
+  map<int, ExternalNode*> externalNodes = globalState->externalNodes;
+  Node& node = globalState->node;
   set<Message*>& store = globalState->messageStore; 
-  vector<Message*> undelivered;
+      // Calculate the delta in sequence numbers so we can request a retransmission.
+      int delta = m->getSequenceNumber() - lastSequenceNumber;
 
-  for (set<Message*>::iterator it = store.begin();
-      it != store.end(); 
-      ++it) {
+      // Ask for re-transmissions from everyone known to have delivered the messages we need.
+      // The reason we ask everyone is that the original sender may have failed.
+      for (int i = lastSequenceNumber + 1; i < m->getSequenceNumber(); i++) {
+        set<int> deliveredNodes;
+        for (map<int, ExternalNode*>::iterator it = externalNodes.begin();
+            it != externalNodes.end();
+            it++) {
 
-    Message* m = *it;
+          ExternalNode* groupMember = it->second;
 
-    // Only check messages from external nodes
-    if (m->getSenderId() != globalState->node.getId()) {
-      ExternalNode* messageOrigin = globalState->externalNodes[m->getSenderId()];    
-      // Has this message been delivered yet?
-      if (m->getSequenceNumber() > messageOrigin->getLastSequenceNumber()) {
-        #ifdef DEBUG
-        cout << "Undelivered: " << *m << endl;
-        #endif
-        undelivered.push_back(m);
+          // Has this process delivered the message we need?
+          if (groupMember->getExternalLastSequenceNumber(m->getSenderId()) >= m->getSequenceNumber()) {
+            deliveredNodes.insert(it->first);
+          }
+        }
+
+        // This should at least contain the original sender.
+        assert(!deliveredNodes.empty());
+
+        map<int, int> acknowledgements;
+        populateAcknowledgements(acknowledgements);
+
+        stringstream ss;
+        ss << m->getSenderId();
+
+        // We don't have store this, so it's safe to use stack memory.
+        Message rm(
+          node.getId(),
+          i,
+          node.getTimestamp(),
+          RETRANSREQUEST,
+          ss.str(),
+          acknowledgements,
+          node.getFailedNodes()
+        );
+
+        for (set<int>::iterator it = deliveredNodes.begin(); it != deliveredNodes.end(); ++it) {
+          #ifdef DEBUG
+          cout << "Asking " << *it << " to retransmit message " << i << " from " << m->getSenderId() << endl;
+          #endif
+          unicast(*it, rm);
+        }
       }
-      #ifdef DEBUG
-      else{
-        cout << "Delivered: " << *m << endl;
-      }
-      #endif
-    }
-  }
-
-  if (undelivered.size() > 0) {
-    // Sort the undelivered list according to causal order, and deliver.
-    #ifdef DEBUG
-    cout << "Sorting undelivered messages by causal order..." << endl;
-    #endif
-    sort(undelivered.begin(), undelivered.end());
-
-    for(vector<Message*>::iterator it = undelivered.begin(); 
-        it != undelivered.end(); 
-        ++it) {
-
-      Message* undeliveredMessage = *it;
-      ExternalNode* undeliveredOrigin = globalState->externalNodes[undeliveredMessage->getSenderId()];
-
-      // Check to see if we can deliver this message now.
-      if (undeliveredMessage->getSequenceNumber() == undeliveredOrigin->getLastSequenceNumber() + 1) {
-        multicast_deliver(*undeliveredMessage);
-      }
-    }
-  }
-  #ifdef DEBUG
-  else{
-    cout << "No undelivered messages remaining." << endl;
-  }
-  #endif
 }
 
 void cleanMessageStore() {
@@ -347,81 +340,96 @@ void receive(int source, const char *message, int len) {
       #endif
       discard(m);
     }
-    // This sequence is next in line! Good to deliver after verifying casual order.
-    else if (m->getSequenceNumber() == lastSequenceNumber + 1) {
+    else{ 
       #ifdef DEBUG
-      cout << "Message " << m->getSequenceNumber() << " from " << m->getSenderId() << " ready to deliver." << endl;
-      #endif
-      // Even though we can deliver it according to FIFO order, we must store to ensure causal order.
-      globalState->storeMessage(m);
-    }
-    // We're missing some messages from this message's origin node.
-    else {
-      #ifdef DEBUG
-      cout << "Got message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Was expecting " << lastSequenceNumber + 1 << "." << endl;
-      #endif
-      // Store this message.
-      globalState->storeMessage(m);
-
-      // Calculate the delta in sequence numbers so we can request a retransmission.
-      int delta = m->getSequenceNumber() - lastSequenceNumber;
-
-      // Ask for re-transmissions from everyone known to have delivered the messages we need.
-      // The reason we ask everyone is that the original sender may have failed.
-      for (int i = lastSequenceNumber + 1; i < m->getSequenceNumber(); i++) {
-        set<int> deliveredNodes;
-        for (map<int, ExternalNode*>::iterator it = externalNodes.begin();
-            it != externalNodes.end();
-            it++) {
-
-          ExternalNode* groupMember = it->second;
-
-          // Has this process delivered the message we need?
-          if (groupMember->getExternalLastSequenceNumber(m->getSenderId()) >= m->getSequenceNumber()) {
-            deliveredNodes.insert(it->first);
-          }
-        }
-
-        // This should at least contain the original sender.
-        assert(!deliveredNodes.empty());
-
-        map<int, int> acknowledgements;
-        populateAcknowledgements(acknowledgements);
-
-        stringstream ss;
-        ss << m->getSenderId();
-
-        // We don't have store this, so it's safe to use stack memory.
-        Message rm(
-          node.getId(),
-          i,
-          node.getTimestamp(),
-          RETRANSREQUEST,
-          ss.str(),
-          acknowledgements,
-          node.getFailedNodes()
-        );
-
-        for (set<int>::iterator it = deliveredNodes.begin(); it != deliveredNodes.end(); ++it) {
-          #ifdef DEBUG
-          cout << "Asking " << *it << " to retransmit message " << i << " from " << m->getSenderId() << endl;
-          #endif
-          unicast(*it, rm);
-        }
+      if (m->getSequenceNumber() == lastSequenceNumber + 1) {
+        // Even though we can deliver it according to FIFO order, we must store to ensure causal order.
+        cout << "Message " << m->getSequenceNumber() << " from " << m->getSenderId() << " ready to deliver." << endl;
       }
-    }
- 
-    #ifdef DEBUG
-    cout << "Attempting to deliver messages..." << endl;
-    #endif
-    processUndelivered();
+      else{
+        cout << "Got message " << m->getSequenceNumber() << " from " << m->getSenderId() << ". Was expecting " << lastSequenceNumber + 1 << "." << endl;
+      }
+      #endif
+      globalState->storeMessage(m);
 
-    #ifdef DEBUG
-    cout << "Finished message delivery attempt." << endl << "Attempting to free up message store..." << endl;
-    #endif
-    cleanMessageStore();
+      #ifdef DEBUG
+      cout << "Requesting retransmissions..." << endl;
+      #endif
+      retransmissionRequests(m, lastSequenceNumber);
+ 
+      #ifdef DEBUG
+      cout << "Attempting to deliver messages..." << endl;
+      #endif
+      processUndelivered();
+
+      #ifdef DEBUG
+      cout << "Finished message delivery attempt." << endl << "Attempting to free up message store..." << endl;
+      #endif
+      cleanMessageStore();
+    }
   }
   else { // if(m->type == HEARTBEAT)
+    retransmissionRequests(m, messageOrigin->getLastSequenceNumber());
     discard(m);
   }
+}
+  
+
+void processUndelivered() {
+  // Construct a list of all the undelivered messages. It is known that all
+  // undelivered messages are either concurrent with or happen-after delivered
+  // messages, so the delivered messages need not be considered during the
+  // causal ordering process.
+  set<Message*>& store = globalState->messageStore; 
+  vector<Message*> undelivered;
+
+  for (set<Message*>::iterator it = store.begin();
+      it != store.end(); 
+      ++it) {
+
+    Message* m = *it;
+
+    // Only check messages from external nodes
+    if (m->getSenderId() != globalState->node.getId()) {
+      ExternalNode* messageOrigin = globalState->externalNodes[m->getSenderId()];    
+      // Has this message been delivered yet?
+      if (m->getSequenceNumber() > messageOrigin->getLastSequenceNumber()) {
+        #ifdef DEBUG
+        cout << "Undelivered: " << *m << endl;
+        #endif
+        undelivered.push_back(m);
+      }
+      #ifdef DEBUG
+      else{
+        cout << "Delivered: " << *m << endl;
+      }
+      #endif
+    }
+  }
+
+  if (undelivered.size() > 0) {
+    // Sort the undelivered list according to causal order, and deliver.
+    #ifdef DEBUG
+    cout << "Sorting undelivered messages by causal order..." << endl;
+    #endif
+    sort(undelivered.begin(), undelivered.end());
+
+    for(vector<Message*>::iterator it = undelivered.begin(); 
+        it != undelivered.end(); 
+        ++it) {
+
+      Message* undeliveredMessage = *it;
+      ExternalNode* undeliveredOrigin = globalState->externalNodes[undeliveredMessage->getSenderId()];
+
+      // Check to see if we can deliver this message now.
+      if (undeliveredMessage->getSequenceNumber() == undeliveredOrigin->getLastSequenceNumber() + 1) {
+        multicast_deliver(*undeliveredMessage);
+      }
+    }
+  }
+  #ifdef DEBUG
+  else{
+    cout << "No undelivered messages remaining." << endl;
+  }
+  #endif
 }

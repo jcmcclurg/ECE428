@@ -11,8 +11,6 @@ void unicast_init(void);
 /* Send a message to destination */
 void usend(int destination, const char *message, int len);
 
-void printstats();
-
 /* Called *by* unicast interface when an incoming unicast message arrives from source */
 void receive(int source, const char *message, int len);
 
@@ -38,8 +36,6 @@ extern int mcast_num_members;
 extern int my_id;
 extern pthread_mutex_t member_lock;
 
-extern char *g_delaydropspec_filepath;
-
 /*** internals ***/
 
 /* File where the list of current group members is stored */
@@ -50,7 +46,5 @@ extern char *g_delaydropspec_filepath;
 #define MAXDELAY    10000000    /* 10s */
 
 #define P_DROP      0.2         /* probability that a packet is dropped */
-
-int debugprintf(const char *format, ...);
 
 #endif

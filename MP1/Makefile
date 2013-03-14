@@ -1,7 +1,7 @@
 SOURCEFILES = unicast.cc mcast.cc chat.cc
 HEADERS = mp1.h
 OFILES = operators.o message.o timestamp.o heartbeat.o state.o
-DEBUG = 
+DEBUG=#-DDEBUG
 
 all: chat
 

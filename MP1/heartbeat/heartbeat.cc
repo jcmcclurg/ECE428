@@ -19,7 +19,6 @@ static void* send_thread_main(void *arg) {
   }
 }
 
-// Interval is in ms.
 Heartbeat::Heartbeat(
     int id,
     int* memberIds,
@@ -43,7 +42,7 @@ Heartbeat::Heartbeat(
   for (int i = 0; i < memberCount; ++i) {  
     // Only set timers for external nodes.
     if (id != memberIds[i]) {  
-      // Set the timer callback
+      // Set the timer callback.
       struct sigaction sa; 
       sigemptyset(&sa.sa_mask);
       sa.sa_flags = SA_SIGINFO; 
@@ -54,7 +53,7 @@ Heartbeat::Heartbeat(
         exit(1);
       }
 
-      // Create heartbeat timers
+      // Create heartbeat timers.
       timer_t timer;
       sigevent sigev;
 

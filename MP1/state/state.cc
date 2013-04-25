@@ -6,47 +6,13 @@
 
 using namespace std;
 
-NodeState::NodeState(int id, int* memberIds, int memberCount) : id(id), sequenceNumber(0), timestamp(id, memberIds, memberCount) {}
-NodeState::~NodeState(){
-  for (set<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
-    delete *it;
-  }
-}
+Node::Node(int id, int* memberIds, int memberCount) : id(id), sequenceNumber(0), timestamp(id, memberIds, memberCount) {}
 
-Message* NodeState::getMessage(int sequenceNumber) {
-  for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
-    if((*it)->getSequenceNumber() == sequenceNumber) {
-      return *it;
-    }
-  }
-  return NULL;
-}
-
-void NodeState::storeMessage(Message* m) {
-  messageStore.insert(m);
-  #ifdef DEBUG
-    cout << "Storing message from "<< id << ": " << *m << endl;
-  #endif
-}
-
-void NodeState::updateFailedNodes(set<int>& otherFailedNodes) {
+void Node::updateFailedNodes(set<int>& otherFailedNodes) {
   failedNodes.insert(otherFailedNodes.begin(), otherFailedNodes.end());
 }
 
-void ExternalNodeState::storeMessage(Message* m) {
-  messageStore.insert(m);
-  #ifdef DEBUG
-    cout << "Storing message from "<< id << ": " << *m << endl;
-  #endif
-}
-
-ExternalNodeState::~ExternalNodeState(){
-  for (set<Message*>::iterator it=messageStore.begin(); it!=messageStore.end(); ++it){
-    delete *it;
-  }
-}
-
-void ExternalNodeState::updateDeliveryAckList(map<int,int>& list){
+void ExternalNode::updateDeliveryAckList(map<int,int>& list){
   #ifdef DEBUG
   cout << "Updating external state[" << id << "] deliveryAckList = {";
   #endif
@@ -65,16 +31,7 @@ void ExternalNodeState::updateDeliveryAckList(map<int,int>& list){
   #endif
 }
 
-Message* ExternalNodeState::getMessage(int sequenceNumber) {
-  for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it){
-    if((*it)->getSequenceNumber() == sequenceNumber) {
-      return *it;
-    }
-  }
-  return NULL;
-}
-
-GlobalState::GlobalState(int ownId, int* memberIds, int memberCount) : state(ownId, memberIds, memberCount) {
+GlobalState::GlobalState(int ownId, int* memberIds, int memberCount) : node(ownId, memberIds, memberCount) {
   #ifdef DEBUG
     cout << "Global state of " << ownId << " instantiated with " << memberCount << " members: ";
   #endif
@@ -83,7 +40,7 @@ GlobalState::GlobalState(int ownId, int* memberIds, int memberCount) : state(own
       #ifdef DEBUG
         cout << memberIds[i] << " ";
       #endif
-      externalStates[memberIds[i]] = new ExternalNodeState(memberIds[i]);
+      externalNodes[memberIds[i]] = new ExternalNode(memberIds[i]);
     }
   } 
   #ifdef DEBUG
@@ -92,11 +49,32 @@ GlobalState::GlobalState(int ownId, int* memberIds, int memberCount) : state(own
 }
 
 GlobalState::~GlobalState() {
+  for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it) {
+    delete *it;
+  }
+
   for (
-      map<int, ExternalNodeState*>::iterator it = externalStates.begin();
-      it != externalStates.end();
-      it++) {
+      map<int, ExternalNode*>::iterator it = externalNodes.begin();
+      it != externalNodes.end();
+      ++it) {
 
     delete it->second;
   }
+}
+
+Message* GlobalState::getMessage(int fromId, int sequenceNumber) {
+  for (set<Message*>::iterator it = messageStore.begin(); it != messageStore.end(); ++it) {
+    Message* m = *it;
+    if(m->getSenderId() == fromId && m->getSequenceNumber() == sequenceNumber) {
+      return m;
+    }
+  }
+  return NULL;
+}
+
+void GlobalState::storeMessage(Message* m) {
+  messageStore.insert(m);
+  #ifdef DEBUG
+    cout << "Storing message from" << m->getSenderId() << ": " << *m << endl;
+  #endif
 }

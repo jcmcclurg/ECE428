@@ -10,17 +10,14 @@
 
 using namespace std;
 
-// Represents our current process.
-class NodeState{
+//! Represents our current process.
+class Node {
   private:
     //! Unique identifier for this process. 
     int id;
         
     //! Sequence counter.
     int sequenceNumber;
-
-    //! List of all messages sent by this node.
-    set<Message*> messageStore;
 
     //! Set keeping track of all nodes this process believes to have failed.
     set<int> failedNodes;
@@ -29,58 +26,76 @@ class NodeState{
     Timestamp timestamp;
 
   public:
-    NodeState(int id, int* memberIds, int memberCount);
-    ~NodeState();
-    Message* getMessage(int sequenceNumber);
-    void updateFailedNodes(set<int>& otherFailedNodes);
+    Node(int id, int* memberIds, int memberCount);
+    Node(int id, set<int> ids) : id(id), sequenceNumber(0), timestamp(id, ids) {}
 
-    NodeState(int id, set<int> ids) : id(id), sequenceNumber(0), timestamp(id, ids) {}
     int getId() { return id; }
     int getSequenceNumber() { return sequenceNumber; }
     Timestamp& getTimestamp() { return timestamp; }
-    set<Message*>& getMessageStore() { return messageStore; }
     set<int>& getFailedNodes() { return failedNodes; }
-    void storeMessage(Message* m);
 
+    //! Merges our failed node set with an external set of failed nodes.
+    //! 
+    //! @param otherFailedNodes The external set of failed nodes to merge.
+    void updateFailedNodes(set<int>& otherFailedNodes);
+
+    //! Increments our own sequence number.
     void sequenceNumberIncrement() { sequenceNumber++; }
 };
 
-// Represents data we need to know about other processes.
-class ExternalNodeState{
+//! Represents data we need to know about other processes.
+class ExternalNode {
   private:
     //! Unique identifier for this external process. 
     int id;
 
     //! Sequence number of the last message delivered from this node.
-    int latestDeliveredSequenceNumber;
+    int lastSequenceNumber;
 
-    //! List of all messages sent by this node.
-    set<Message*> messageStore;
-
-    //! Sequence number of the messages this node has delivered
+    //! A map from process ID k to the last sequence number this external process 
+    //! has delivered from process k.
     map<int, int> deliveryAckList;
 
   public:
-    void updateDeliveryAckList(map<int,int>& list);
-    Message* getMessage(int sequenceNumber);
+    ExternalNode(int id) : id(id), lastSequenceNumber(0) {}
 
-    ExternalNodeState(int id) : id(id), latestDeliveredSequenceNumber(0) {}
-    ~ExternalNodeState();
     int getId() const { return id; }
-    int getLatestDeliveredSequenceNumber() const { return latestDeliveredSequenceNumber; }
-    set<Message*> getMessageStore(){ return messageStore; }
-    void latestDeliveredSequenceNumberIncrement() { latestDeliveredSequenceNumber++; }
-    int getExternalLatestDeliveredSequenceNumber(int id) { return deliveryAckList[id]; }
-    void storeMessage(Message* m);
+    int getLastSequenceNumber() const { return lastSequenceNumber; }
+    void lastSequenceNumberIncrement() { lastSequenceNumber++; }
+    int getExternalLastSequenceNumber(int id) { return deliveryAckList[id]; }
+
+    //! Merges our delivery ack list with an external list of delivery acks.
+    //! 
+    //! @param list The external list of delivery acks to merge.
+    void updateDeliveryAckList(map<int,int>& list);
 };
 
+//! Contains the global state of our chat application.
 struct GlobalState {
   public:
-  NodeState state;
-  map<int, ExternalNodeState*> externalStates;
+    //! List of all messages sent by everyone.
+    set<Message*> messageStore;
 
-  GlobalState(int ownId, int* memberIds, int memberCount);
-  ~GlobalState();
+    //! The node representing our current chat process.
+    Node node;
+
+    //! A map from process ID to an ExternalNode pointer.
+    map<int, ExternalNode*> externalNodes;
+
+    GlobalState(int ownId, int* memberIds, int memberCount);
+    ~GlobalState();
+
+    //! Attempts to retrieve a message from the global message store.
+    //! 
+    //! @param fromId The sender process ID of our requested message.
+    //! @param sequenceNumber The sequence number of our requested message.
+    //! @return Either the message requested or NULL if it cannot be found.
+    Message* getMessage(int fromId, int sequenceNumber);
+
+    //! Stores a message into the global message store.
+    //! 
+    //! @param m A pointer to the message we want to store.
+    void storeMessage(Message* m);
 };
 
 #endif

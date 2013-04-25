@@ -23,17 +23,20 @@ using namespace std;
 #include "rmcast.h"
 
 /* Defines */
-#define HEARTBEAT_MS 60 * 1000L
-#define TIMEOUT_MS 240 * 1000L
+#define HEARTBEAT_MS 3 * 1000L
 
-void populateAcknowledgements(
-      map<int, int>& acknowledgements, 
-      map<int, ExternalNodeState*>& externalStates);
+void populateAcknowledgements(map<int, int>& acknowledgements);
 
 void unicast(int to, Message& m);
+
 static void heartbeat_failure(int sig, siginfo_t *si, void *uc);
 static void heartbeat_send();
+
 void multicast_deliver(Message& m);
 void initIfNecessary();
 void discard(Message* m);
+
+void processUndelivered();
+void cleanMessageStore();
+
 #endif

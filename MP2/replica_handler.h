@@ -24,6 +24,9 @@ public:
 	virtual void apply(std::string& _return, const std::string& name, const std::string& operation);
 	virtual void getState(std::string& _return, const std::string& name);
 	virtual void remove(const std::string& name);
+	int16_t whoLeads(void);
+	int16_t whoHas(const std::string& name);
+	bool stateExists(const std::string& name);
 	virtual void exit(void);
 
 private:
@@ -36,6 +39,10 @@ private:
  	// check to see if replica exists and throw a error otherwise
  	void checkExists(const std::string & name) const throw (ReplicaError);
  	// add any private methods and variables you need below. 
+
+ 	// starts a leader election. If there is no current leader, shuts down entire RM functionality until completed. Returns the ID of the new leader.
+ 	int leader;
+ 	int startLeaderElection(void);
 };
 
 } // namespace mp2 

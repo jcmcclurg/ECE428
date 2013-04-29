@@ -19,7 +19,8 @@ namespace mp2 {
 struct ErrorType {
   enum type {
     NOT_FOUND = 0,
-    ALREADY_EXISTS = 1
+    ALREADY_EXISTS = 1,
+    NOT_LEADER = 2
   };
 };
 

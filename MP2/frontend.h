@@ -11,10 +11,11 @@ namespace mp2 {
 	
 class FrontEnd
 {
-	boost::shared_ptr<Replicas> replicas;
 private:
 	int id;
+	int leader;
 public:
+	boost::shared_ptr<Replicas> replicas;
 	FrontEnd(boost::shared_ptr<Replicas> replicas, int i);
 	~FrontEnd();
 
@@ -27,6 +28,7 @@ public:
 	// the state machine must throw an exception when apply() or getState() 
 	// are called
 	void remove(const std::string &name);
+	int findLeader(void);
 };
 
 } // namespace

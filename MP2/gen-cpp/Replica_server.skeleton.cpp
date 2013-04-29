@@ -42,6 +42,21 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("remove\n");
   }
 
+  int16_t whoLeads() {
+    // Your implementation goes here
+    printf("whoLeads\n");
+  }
+
+  bool stateExists(const std::string& name) {
+    // Your implementation goes here
+    printf("stateExists\n");
+  }
+
+  int16_t whoHas(const std::string& name) {
+    // Your implementation goes here
+    printf("whoHas\n");
+  }
+
   void exit() {
     // Your implementation goes here
     printf("exit\n");

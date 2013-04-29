@@ -12,13 +12,15 @@ namespace mp2 {
 
 int _kErrorTypeValues[] = {
   ErrorType::NOT_FOUND,
-  ErrorType::ALREADY_EXISTS
+  ErrorType::ALREADY_EXISTS,
+  ErrorType::NOT_LEADER
 };
 const char* _kErrorTypeNames[] = {
   "NOT_FOUND",
-  "ALREADY_EXISTS"
+  "ALREADY_EXISTS",
+  "NOT_LEADER"
 };
-const std::map<int, const char*> _ErrorType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(2, _kErrorTypeValues, _kErrorTypeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+const std::map<int, const char*> _ErrorType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(3, _kErrorTypeValues, _kErrorTypeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
 const char* ReplicaError::ascii_fingerprint = "38C252E94E93B69D04EB3A6EE2F9EDFB";
 const uint8_t ReplicaError::binary_fingerprint[16] = {0x38,0xC2,0x52,0xE9,0x4E,0x93,0xB6,0x9D,0x04,0xEB,0x3A,0x6E,0xE2,0xF9,0xED,0xFB};

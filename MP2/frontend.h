@@ -12,8 +12,10 @@ namespace mp2 {
 class FrontEnd
 {
 	boost::shared_ptr<Replicas> replicas;
+private:
+	int id;
 public:
-	FrontEnd(boost::shared_ptr<Replicas> replicas);
+	FrontEnd(boost::shared_ptr<Replicas> replicas, int i);
 	~FrontEnd();
 
 	// create a new StateMachine and return a stub

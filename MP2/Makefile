@@ -2,7 +2,7 @@ GTEST_DIR=/class/ece428/libs/gtest-1.6.0
 THRIFT_DIR=/class/ece428/libs
 THRIFT=$(THRIFT_DIR)/bin/thrift
 CFLAGS=-I./gen-cpp -g
-CXXFLAGS=-I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift -I$(THRIFT_DIR)/include -Wall -Wextra -g
+CXXFLAGS=-DDEBUGLEVEL=1 -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift -I$(THRIFT_DIR)/include -Wall -Wextra -g
 SRCS:=$(wildcard *.cpp)
 
 TESTS:=$(patsubst %.cpp,%,$(wildcard *_unittest.cpp))

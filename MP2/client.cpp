@@ -10,19 +10,18 @@ using boost::shared_ptr;
 int main(int argc, char **argv) {
 	shared_ptr<Replicas> replicas(new Replicas(argc, argv));
 
-	FrontEnd frontEnd(replicas);
-
+	FrontEnd frontEnd(replicas, 1);
 
 	try {
-		shared_ptr<StateMachine> machine = frontEnd.create("testmachine", "initstate");
+		shared_ptr<StateMachine> machine = frontEnd.create("statemachine1", "initialstate");
 
 		cout << machine->getState() << endl;
 
-		cout << machine->apply("testop") << endl;
+		cout << machine->apply("newstate") << endl;
 
 		cout << machine->getState() << endl;
 
-		frontEnd.remove("testmachine");
+		frontEnd.remove("statemachine1");
 
 	} catch (ReplicaError e) {
 			cerr << e.message << endl;

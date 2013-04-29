@@ -1,3 +1,4 @@
+#include "settings.h"
 #include "replica_handler.h"
 
 using namespace mp2;
@@ -10,6 +11,7 @@ using boost::shared_ptr;
 Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> replicas) 
 : factory(factory), id(myid), replicas(replicas) {
 	// any initialization you need goes here
+	DEBUG( "Initialized RM " << myid );
 }
 
 void Replica::checkExists(const string &name) const throw (ReplicaError) {
@@ -30,6 +32,7 @@ void Replica::create(const string & name, const string & initialState) {
 		error.message = string("Machine ") + name + (" already exists");
 		throw error;
 	}
+	DEBUG("RM " << id << " making a copy of " << name << ":" << initialState);
  	machines.insert(make_pair(name, factory.make(initialState)));
 }
 

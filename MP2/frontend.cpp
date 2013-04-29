@@ -1,6 +1,7 @@
 #include "frontend.h"
 #include <boost/shared_ptr.hpp>
 #include "statemachine.h"
+#include "settings.h"
 
 using namespace std;
 using namespace mp2;
@@ -27,13 +28,18 @@ public:
 	}
 };
 
-FrontEnd::FrontEnd(boost::shared_ptr<Replicas> replicas) : replicas(replicas) {}
+FrontEnd::FrontEnd(boost::shared_ptr<Replicas> replicas, int i) : replicas(replicas),  id(i) {
+	DEBUG("Front end " << id << " started up with access to " << (*replicas).numReplicas() << " replica managers.");
+}
 
 FrontEnd::~FrontEnd() { }
 
 shared_ptr<StateMachine> FrontEnd::create(const string &name, const string &initialState) {
-	// Always uses machine 0
-	(*replicas)[0].create(name, initialState);
+	DEBUG("Front end " << id << " creating initial replicas of " << name);
+	for(int i = 0; i < (*replicas).numReplicas(); i++){
+		(*replicas)[i].create(name, initialState);
+	}
+
 	return get(name);
 }
 

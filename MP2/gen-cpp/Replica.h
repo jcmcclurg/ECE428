@@ -19,9 +19,12 @@ class ReplicaIf {
   virtual void apply(std::string& _return, const std::string& name, const std::string& operation) = 0;
   virtual void getState(std::string& _return, const std::string& name) = 0;
   virtual void remove(const std::string& name) = 0;
-  virtual int16_t whoLeads() = 0;
+  virtual int16_t prepareGetState(const std::string& name) = 0;
+  virtual int16_t getLeader() = 0;
+  virtual int16_t getQueueLen() = 0;
+  virtual int16_t getBwUtilization() = 0;
+  virtual int16_t getMemUtilization() = 0;
   virtual bool stateExists(const std::string& name) = 0;
-  virtual int16_t whoHas(const std::string& name) = 0;
   virtual void exit() = 0;
 };
 
@@ -64,16 +67,28 @@ class ReplicaNull : virtual public ReplicaIf {
   void remove(const std::string& /* name */) {
     return;
   }
-  int16_t whoLeads() {
+  int16_t prepareGetState(const std::string& /* name */) {
+    int16_t _return = 0;
+    return _return;
+  }
+  int16_t getLeader() {
+    int16_t _return = 0;
+    return _return;
+  }
+  int16_t getQueueLen() {
+    int16_t _return = 0;
+    return _return;
+  }
+  int16_t getBwUtilization() {
+    int16_t _return = 0;
+    return _return;
+  }
+  int16_t getMemUtilization() {
     int16_t _return = 0;
     return _return;
   }
   bool stateExists(const std::string& /* name */) {
     bool _return = false;
-    return _return;
-  }
-  int16_t whoHas(const std::string& /* name */) {
-    int16_t _return = 0;
     return _return;
   }
   void exit() {
@@ -551,25 +566,38 @@ class Replica_remove_presult {
 
 };
 
+typedef struct _Replica_prepareGetState_args__isset {
+  _Replica_prepareGetState_args__isset() : name(false) {}
+  bool name;
+} _Replica_prepareGetState_args__isset;
 
-class Replica_whoLeads_args {
+class Replica_prepareGetState_args {
  public:
 
-  Replica_whoLeads_args() {
+  Replica_prepareGetState_args() : name() {
   }
 
-  virtual ~Replica_whoLeads_args() throw() {}
+  virtual ~Replica_prepareGetState_args() throw() {}
 
+  std::string name;
 
-  bool operator == (const Replica_whoLeads_args & /* rhs */) const
+  _Replica_prepareGetState_args__isset __isset;
+
+  void __set_name(const std::string& val) {
+    name = val;
+  }
+
+  bool operator == (const Replica_prepareGetState_args & rhs) const
   {
+    if (!(name == rhs.name))
+      return false;
     return true;
   }
-  bool operator != (const Replica_whoLeads_args &rhs) const {
+  bool operator != (const Replica_prepareGetState_args &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const Replica_whoLeads_args & ) const;
+  bool operator < (const Replica_prepareGetState_args & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -577,69 +605,456 @@ class Replica_whoLeads_args {
 };
 
 
-class Replica_whoLeads_pargs {
+class Replica_prepareGetState_pargs {
  public:
 
 
-  virtual ~Replica_whoLeads_pargs() throw() {}
+  virtual ~Replica_prepareGetState_pargs() throw() {}
 
+  const std::string* name;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _Replica_whoLeads_result__isset {
-  _Replica_whoLeads_result__isset() : success(false) {}
+typedef struct _Replica_prepareGetState_result__isset {
+  _Replica_prepareGetState_result__isset() : success(false), e(false) {}
   bool success;
-} _Replica_whoLeads_result__isset;
+  bool e;
+} _Replica_prepareGetState_result__isset;
 
-class Replica_whoLeads_result {
+class Replica_prepareGetState_result {
  public:
 
-  Replica_whoLeads_result() : success(0) {
+  Replica_prepareGetState_result() : success(0) {
   }
 
-  virtual ~Replica_whoLeads_result() throw() {}
+  virtual ~Replica_prepareGetState_result() throw() {}
 
   int16_t success;
+  ReplicaError e;
 
-  _Replica_whoLeads_result__isset __isset;
+  _Replica_prepareGetState_result__isset __isset;
 
   void __set_success(const int16_t val) {
     success = val;
   }
 
-  bool operator == (const Replica_whoLeads_result & rhs) const
+  void __set_e(const ReplicaError& val) {
+    e = val;
+  }
+
+  bool operator == (const Replica_prepareGetState_result & rhs) const
   {
     if (!(success == rhs.success))
       return false;
+    if (!(e == rhs.e))
+      return false;
     return true;
   }
-  bool operator != (const Replica_whoLeads_result &rhs) const {
+  bool operator != (const Replica_prepareGetState_result &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const Replica_whoLeads_result & ) const;
+  bool operator < (const Replica_prepareGetState_result & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _Replica_whoLeads_presult__isset {
-  _Replica_whoLeads_presult__isset() : success(false) {}
+typedef struct _Replica_prepareGetState_presult__isset {
+  _Replica_prepareGetState_presult__isset() : success(false), e(false) {}
   bool success;
-} _Replica_whoLeads_presult__isset;
+  bool e;
+} _Replica_prepareGetState_presult__isset;
 
-class Replica_whoLeads_presult {
+class Replica_prepareGetState_presult {
  public:
 
 
-  virtual ~Replica_whoLeads_presult() throw() {}
+  virtual ~Replica_prepareGetState_presult() throw() {}
+
+  int16_t* success;
+  ReplicaError e;
+
+  _Replica_prepareGetState_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+
+class Replica_getLeader_args {
+ public:
+
+  Replica_getLeader_args() {
+  }
+
+  virtual ~Replica_getLeader_args() throw() {}
+
+
+  bool operator == (const Replica_getLeader_args & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_getLeader_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getLeader_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_getLeader_pargs {
+ public:
+
+
+  virtual ~Replica_getLeader_pargs() throw() {}
+
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getLeader_result__isset {
+  _Replica_getLeader_result__isset() : success(false) {}
+  bool success;
+} _Replica_getLeader_result__isset;
+
+class Replica_getLeader_result {
+ public:
+
+  Replica_getLeader_result() : success(0) {
+  }
+
+  virtual ~Replica_getLeader_result() throw() {}
+
+  int16_t success;
+
+  _Replica_getLeader_result__isset __isset;
+
+  void __set_success(const int16_t val) {
+    success = val;
+  }
+
+  bool operator == (const Replica_getLeader_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_getLeader_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getLeader_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getLeader_presult__isset {
+  _Replica_getLeader_presult__isset() : success(false) {}
+  bool success;
+} _Replica_getLeader_presult__isset;
+
+class Replica_getLeader_presult {
+ public:
+
+
+  virtual ~Replica_getLeader_presult() throw() {}
 
   int16_t* success;
 
-  _Replica_whoLeads_presult__isset __isset;
+  _Replica_getLeader_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+
+class Replica_getQueueLen_args {
+ public:
+
+  Replica_getQueueLen_args() {
+  }
+
+  virtual ~Replica_getQueueLen_args() throw() {}
+
+
+  bool operator == (const Replica_getQueueLen_args & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_getQueueLen_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getQueueLen_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_getQueueLen_pargs {
+ public:
+
+
+  virtual ~Replica_getQueueLen_pargs() throw() {}
+
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getQueueLen_result__isset {
+  _Replica_getQueueLen_result__isset() : success(false) {}
+  bool success;
+} _Replica_getQueueLen_result__isset;
+
+class Replica_getQueueLen_result {
+ public:
+
+  Replica_getQueueLen_result() : success(0) {
+  }
+
+  virtual ~Replica_getQueueLen_result() throw() {}
+
+  int16_t success;
+
+  _Replica_getQueueLen_result__isset __isset;
+
+  void __set_success(const int16_t val) {
+    success = val;
+  }
+
+  bool operator == (const Replica_getQueueLen_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_getQueueLen_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getQueueLen_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getQueueLen_presult__isset {
+  _Replica_getQueueLen_presult__isset() : success(false) {}
+  bool success;
+} _Replica_getQueueLen_presult__isset;
+
+class Replica_getQueueLen_presult {
+ public:
+
+
+  virtual ~Replica_getQueueLen_presult() throw() {}
+
+  int16_t* success;
+
+  _Replica_getQueueLen_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+
+class Replica_getBwUtilization_args {
+ public:
+
+  Replica_getBwUtilization_args() {
+  }
+
+  virtual ~Replica_getBwUtilization_args() throw() {}
+
+
+  bool operator == (const Replica_getBwUtilization_args & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_getBwUtilization_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getBwUtilization_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_getBwUtilization_pargs {
+ public:
+
+
+  virtual ~Replica_getBwUtilization_pargs() throw() {}
+
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getBwUtilization_result__isset {
+  _Replica_getBwUtilization_result__isset() : success(false) {}
+  bool success;
+} _Replica_getBwUtilization_result__isset;
+
+class Replica_getBwUtilization_result {
+ public:
+
+  Replica_getBwUtilization_result() : success(0) {
+  }
+
+  virtual ~Replica_getBwUtilization_result() throw() {}
+
+  int16_t success;
+
+  _Replica_getBwUtilization_result__isset __isset;
+
+  void __set_success(const int16_t val) {
+    success = val;
+  }
+
+  bool operator == (const Replica_getBwUtilization_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_getBwUtilization_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getBwUtilization_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getBwUtilization_presult__isset {
+  _Replica_getBwUtilization_presult__isset() : success(false) {}
+  bool success;
+} _Replica_getBwUtilization_presult__isset;
+
+class Replica_getBwUtilization_presult {
+ public:
+
+
+  virtual ~Replica_getBwUtilization_presult() throw() {}
+
+  int16_t* success;
+
+  _Replica_getBwUtilization_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+
+class Replica_getMemUtilization_args {
+ public:
+
+  Replica_getMemUtilization_args() {
+  }
+
+  virtual ~Replica_getMemUtilization_args() throw() {}
+
+
+  bool operator == (const Replica_getMemUtilization_args & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_getMemUtilization_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getMemUtilization_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_getMemUtilization_pargs {
+ public:
+
+
+  virtual ~Replica_getMemUtilization_pargs() throw() {}
+
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getMemUtilization_result__isset {
+  _Replica_getMemUtilization_result__isset() : success(false) {}
+  bool success;
+} _Replica_getMemUtilization_result__isset;
+
+class Replica_getMemUtilization_result {
+ public:
+
+  Replica_getMemUtilization_result() : success(0) {
+  }
+
+  virtual ~Replica_getMemUtilization_result() throw() {}
+
+  int16_t success;
+
+  _Replica_getMemUtilization_result__isset __isset;
+
+  void __set_success(const int16_t val) {
+    success = val;
+  }
+
+  bool operator == (const Replica_getMemUtilization_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_getMemUtilization_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_getMemUtilization_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_getMemUtilization_presult__isset {
+  _Replica_getMemUtilization_presult__isset() : success(false) {}
+  bool success;
+} _Replica_getMemUtilization_presult__isset;
+
+class Replica_getMemUtilization_presult {
+ public:
+
+
+  virtual ~Replica_getMemUtilization_presult() throw() {}
+
+  int16_t* success;
+
+  _Replica_getMemUtilization_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -697,9 +1112,8 @@ class Replica_stateExists_pargs {
 };
 
 typedef struct _Replica_stateExists_result__isset {
-  _Replica_stateExists_result__isset() : success(false), e(false) {}
+  _Replica_stateExists_result__isset() : success(false) {}
   bool success;
-  bool e;
 } _Replica_stateExists_result__isset;
 
 class Replica_stateExists_result {
@@ -711,7 +1125,6 @@ class Replica_stateExists_result {
   virtual ~Replica_stateExists_result() throw() {}
 
   bool success;
-  ReplicaError e;
 
   _Replica_stateExists_result__isset __isset;
 
@@ -719,15 +1132,9 @@ class Replica_stateExists_result {
     success = val;
   }
 
-  void __set_e(const ReplicaError& val) {
-    e = val;
-  }
-
   bool operator == (const Replica_stateExists_result & rhs) const
   {
     if (!(success == rhs.success))
-      return false;
-    if (!(e == rhs.e))
       return false;
     return true;
   }
@@ -743,9 +1150,8 @@ class Replica_stateExists_result {
 };
 
 typedef struct _Replica_stateExists_presult__isset {
-  _Replica_stateExists_presult__isset() : success(false), e(false) {}
+  _Replica_stateExists_presult__isset() : success(false) {}
   bool success;
-  bool e;
 } _Replica_stateExists_presult__isset;
 
 class Replica_stateExists_presult {
@@ -755,127 +1161,8 @@ class Replica_stateExists_presult {
   virtual ~Replica_stateExists_presult() throw() {}
 
   bool* success;
-  ReplicaError e;
 
   _Replica_stateExists_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
-typedef struct _Replica_whoHas_args__isset {
-  _Replica_whoHas_args__isset() : name(false) {}
-  bool name;
-} _Replica_whoHas_args__isset;
-
-class Replica_whoHas_args {
- public:
-
-  Replica_whoHas_args() : name() {
-  }
-
-  virtual ~Replica_whoHas_args() throw() {}
-
-  std::string name;
-
-  _Replica_whoHas_args__isset __isset;
-
-  void __set_name(const std::string& val) {
-    name = val;
-  }
-
-  bool operator == (const Replica_whoHas_args & rhs) const
-  {
-    if (!(name == rhs.name))
-      return false;
-    return true;
-  }
-  bool operator != (const Replica_whoHas_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const Replica_whoHas_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class Replica_whoHas_pargs {
- public:
-
-
-  virtual ~Replica_whoHas_pargs() throw() {}
-
-  const std::string* name;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _Replica_whoHas_result__isset {
-  _Replica_whoHas_result__isset() : success(false), e(false) {}
-  bool success;
-  bool e;
-} _Replica_whoHas_result__isset;
-
-class Replica_whoHas_result {
- public:
-
-  Replica_whoHas_result() : success(0) {
-  }
-
-  virtual ~Replica_whoHas_result() throw() {}
-
-  int16_t success;
-  ReplicaError e;
-
-  _Replica_whoHas_result__isset __isset;
-
-  void __set_success(const int16_t val) {
-    success = val;
-  }
-
-  void __set_e(const ReplicaError& val) {
-    e = val;
-  }
-
-  bool operator == (const Replica_whoHas_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    if (!(e == rhs.e))
-      return false;
-    return true;
-  }
-  bool operator != (const Replica_whoHas_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const Replica_whoHas_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _Replica_whoHas_presult__isset {
-  _Replica_whoHas_presult__isset() : success(false), e(false) {}
-  bool success;
-  bool e;
-} _Replica_whoHas_presult__isset;
-
-class Replica_whoHas_presult {
- public:
-
-
-  virtual ~Replica_whoHas_presult() throw() {}
-
-  int16_t* success;
-  ReplicaError e;
-
-  _Replica_whoHas_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -950,15 +1237,24 @@ class ReplicaClient : virtual public ReplicaIf {
   void remove(const std::string& name);
   void send_remove(const std::string& name);
   void recv_remove();
-  int16_t whoLeads();
-  void send_whoLeads();
-  int16_t recv_whoLeads();
+  int16_t prepareGetState(const std::string& name);
+  void send_prepareGetState(const std::string& name);
+  int16_t recv_prepareGetState();
+  int16_t getLeader();
+  void send_getLeader();
+  int16_t recv_getLeader();
+  int16_t getQueueLen();
+  void send_getQueueLen();
+  int16_t recv_getQueueLen();
+  int16_t getBwUtilization();
+  void send_getBwUtilization();
+  int16_t recv_getBwUtilization();
+  int16_t getMemUtilization();
+  void send_getMemUtilization();
+  int16_t recv_getMemUtilization();
   bool stateExists(const std::string& name);
   void send_stateExists(const std::string& name);
   bool recv_stateExists();
-  int16_t whoHas(const std::string& name);
-  void send_whoHas(const std::string& name);
-  int16_t recv_whoHas();
   void exit();
   void send_exit();
  protected:
@@ -980,9 +1276,12 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_apply(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getState(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_remove(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_whoLeads(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_prepareGetState(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_getLeader(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_getQueueLen(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_getBwUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_getMemUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_stateExists(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_whoHas(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_exit(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   ReplicaProcessor(boost::shared_ptr<ReplicaIf> iface) :
@@ -991,9 +1290,12 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["apply"] = &ReplicaProcessor::process_apply;
     processMap_["getState"] = &ReplicaProcessor::process_getState;
     processMap_["remove"] = &ReplicaProcessor::process_remove;
-    processMap_["whoLeads"] = &ReplicaProcessor::process_whoLeads;
+    processMap_["prepareGetState"] = &ReplicaProcessor::process_prepareGetState;
+    processMap_["getLeader"] = &ReplicaProcessor::process_getLeader;
+    processMap_["getQueueLen"] = &ReplicaProcessor::process_getQueueLen;
+    processMap_["getBwUtilization"] = &ReplicaProcessor::process_getBwUtilization;
+    processMap_["getMemUtilization"] = &ReplicaProcessor::process_getMemUtilization;
     processMap_["stateExists"] = &ReplicaProcessor::process_stateExists;
-    processMap_["whoHas"] = &ReplicaProcessor::process_whoHas;
     processMap_["exit"] = &ReplicaProcessor::process_exit;
   }
 
@@ -1061,13 +1363,49 @@ class ReplicaMultiface : virtual public ReplicaIf {
     ifaces_[i]->remove(name);
   }
 
-  int16_t whoLeads() {
+  int16_t prepareGetState(const std::string& name) {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->whoLeads();
+      ifaces_[i]->prepareGetState(name);
     }
-    return ifaces_[i]->whoLeads();
+    return ifaces_[i]->prepareGetState(name);
+  }
+
+  int16_t getLeader() {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->getLeader();
+    }
+    return ifaces_[i]->getLeader();
+  }
+
+  int16_t getQueueLen() {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->getQueueLen();
+    }
+    return ifaces_[i]->getQueueLen();
+  }
+
+  int16_t getBwUtilization() {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->getBwUtilization();
+    }
+    return ifaces_[i]->getBwUtilization();
+  }
+
+  int16_t getMemUtilization() {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->getMemUtilization();
+    }
+    return ifaces_[i]->getMemUtilization();
   }
 
   bool stateExists(const std::string& name) {
@@ -1077,15 +1415,6 @@ class ReplicaMultiface : virtual public ReplicaIf {
       ifaces_[i]->stateExists(name);
     }
     return ifaces_[i]->stateExists(name);
-  }
-
-  int16_t whoHas(const std::string& name) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->whoHas(name);
-    }
-    return ifaces_[i]->whoHas(name);
   }
 
   void exit() {

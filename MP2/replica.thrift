@@ -25,14 +25,13 @@ service Replica {
 	// remove a state machine
 	void remove(1: string name) throws (1:ReplicaError e),
 
-	// ask about the leader, or ask the leader for information.
-	i16 whoLeads(),
-
-	// this is just a test
-	bool stateExists(1: string name) throws (1:ReplicaError e),
-
-	// ask about the 
-	i16 whoHas(1: string name) throws (1:ReplicaError e),
+	// ask about RM info
+	i16 prepareGetState(1: string name) throws (1:ReplicaError e),
+	i16 getLeader(),
+	i16 getQueueLen(),
+	i16 getBwUtilization(),
+	i16 getMemUtilization(),
+	bool stateExists(1: string name),
 
 	// exit / crash
 	oneway void exit()

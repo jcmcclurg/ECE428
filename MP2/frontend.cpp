@@ -31,7 +31,7 @@ public:
 	}
 };
 
-FrontEnd::FrontEnd(boost::shared_ptr<Replicas> replicas, int i) : replicas(replicas),  id(i), leader(-1) {
+FrontEnd::FrontEnd(boost::shared_ptr<Replicas> eeplicas, int i) : replicas(replicas),  id(i), leader(-1) {
 	DEBUG("FE " << id << " started up with access to " << (*replicas).numReplicas() << " replica managers.");
 }
 

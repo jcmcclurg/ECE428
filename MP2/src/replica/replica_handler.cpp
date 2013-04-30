@@ -25,7 +25,7 @@ void Replica::checkExists(const string &name) const throw (ReplicaError) {
 		ReplicaError error;
 		error.type = ErrorType::NOT_FOUND;
 		error.name = name;
-		error.message = string("Cannot find machine ") + name;
+		error.message = string("RM cannot find machine ") + name;
 		throw error;
 	}
 }
@@ -36,6 +36,7 @@ void Replica::reshuffleReplicas(const std::string& name, const std::string& val)
 	do{
 		done = true;
 		for(int i=0; i< (*replicas).numReplicas(); i++){
+			try{
 			if((*replicas)[i].stateExists(name) && (*replicas)[i].getMemUtilization() > 1){
 				found = true;
 				for(int j=0; j< (*replicas).numReplicas(); j++){
@@ -48,14 +49,7 @@ void Replica::reshuffleReplicas(const std::string& name, const std::string& val)
 						break;
 					}
 				}
-			}
-		}
-		if(!found){
-			ReplicaError error;
-			error.type = ErrorType::NOT_FOUND;
-			error.name = name;
-			error.message = string("Cannot find machine ") + name;
-			throw error;
+			}}catch(ReplicaError){}
 		}
 	} while(!done);
 }
@@ -66,8 +60,10 @@ void Replica::createReplicas(const std::string& name, const std::string& val){
 		int bm2 = INT_MAX;
 		int bmi2;
 		count = 0;
-		// Find optimal locations to store and copy from
-		for(int i=0; i< (*replicas).numReplicas(); i++){
+		// Find optimal locations to store to
+		int i;
+		for(i=0; i< (*replicas).numReplicas(); i++){
+			try{
 			int b = (*replicas)[i].getBwUtilization();
 			if((*replicas)[i].stateExists(name)){
 				count++;
@@ -79,15 +75,8 @@ void Replica::createReplicas(const std::string& name, const std::string& val){
 				}
 				if(b < bm2){ bmi2 = i; bm2 = b; }
 			}
+			}catch(ReplicaError){}
 		}
-		if(count == 0){
-			ReplicaError error;
-			error.type = ErrorType::NOT_FOUND;
-			error.name = name;
-			error.message = string("Cannot find machine ") + name;
-			throw error;
-		}
-		
 		if(count < MIN_REPLICAS){
 			//(*replicas)[bm].getState(ret,name);
 			(*replicas)[bm2].create(name,val);
@@ -98,6 +87,15 @@ void Replica::createReplicas(const std::string& name, const std::string& val){
 int16_t Replica::getLeader(void){
 	if(leader == -1){
 		leader = startLeaderElection();
+	}
+	// Ensure that the leader is still alive.
+	else if(leader != id){
+		try{
+			leader = (*replicas)[leader].getLeader();
+		}
+		catch(ReplicaError){
+			leader = startLeaderElection();
+		}
 	}
 	return leader;
 }
@@ -119,17 +117,20 @@ int16_t Replica::prepareGetState(const std::string& name){
 		error.message = string("Only the leader can prepare a get.");
 		throw error;
 	}
+	DEBUG("RM " << id << " (leader) responding to a prepare for " << name);
 
 	int bm = INT_MAX;
 	int bmi;
 	bool success = false;
 
 	for(int i=0; i< (*replicas).numReplicas(); i++){
+		try{
 		if((*replicas)[i].stateExists(name)){
 			success = true;
 			int b = (*replicas)[i].getBwUtilization();
 			if(b < bm){ bmi = i; bm = b; }
-		}
+		}}
+		catch(ReplicaError){}
 	}
 	if(!success){
 		ReplicaError error;
@@ -138,6 +139,10 @@ int16_t Replica::prepareGetState(const std::string& name){
 		error.message = string("Cannot find machine ") + name;
 		throw error;
 	}
+	string s;
+	(*replicas)[(*replicas).numReplicas()-1].getState(s,name);
+	createReplicas(name, s);
+	reshuffleReplicas(name, s);
 	return bmi;
 }
 
@@ -159,27 +164,48 @@ void Replica::create(const string & name, const string & initialState) {
 		error.message = string("Machine ") + name + (" already exists");
 		throw error;
 	}
+	DEBUG("RM" << id << " creating " << name);
 	queueLen++;
 	memUtilization++;
  	machines.insert(make_pair(name, factory.make(initialState)));
 	queueLen--;
 
-//	if(id == leader){
-//		createReplicas(name, initialState);
-//		reshuffleReplicas(name, initialState);
-//	}
+	if(leader == id){
+		/*for(int i=0; i< (*replicas).numReplicas(); i++){
+			if(i != id){
+				try{
+					(*replicas)[i].create(name, initialState);
+				}catch(ReplicaError){}
+			}
+		}*/
+		createReplicas(name, initialState);
+		reshuffleReplicas(name, initialState);
+	}
 }
 
 void Replica::apply(string & result, const string & name, const string& operation) {
 	checkExists(name);
+	DEBUG("RM" << id << " applying " << name);
 	queueLen++;
 	bwUtilization++;
 	result = machines[name]->apply(operation);
 	queueLen--;
+
+	if(leader == id){
+		for(int i=0; i< (*replicas).numReplicas(); i++){
+			if(i != id){
+				try{
+					string rslt;
+					(*replicas)[i].apply(rslt, name, operation);
+				}catch(ReplicaError){}
+			}
+		}
+	}
 }
 
 void Replica::getState(string& result, const string &name) {
 	checkExists(name);
+	DEBUG("RM" << id << " getting " << name);
 	queueLen++;
 	bwUtilization++;
 	result = machines[name]->getState();
@@ -188,10 +214,21 @@ void Replica::getState(string& result, const string &name) {
 
 void Replica::remove(const string &name) {
 	checkExists(name);
+	DEBUG("RM" << id << " removing " << name);
 	queueLen++;
 	memUtilization--;
 	machines.erase(name);
 	queueLen--;
+
+	if(leader == id){
+		for(int i=0; i< (*replicas).numReplicas(); i++){
+			if(i != id){
+				try{
+					(*replicas)[i].remove(name);
+				}catch(ReplicaError){}
+			}
+		}
+	}
 }
 
 /* DO NOT CHANGE THIS */

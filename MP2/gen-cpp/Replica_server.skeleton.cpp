@@ -67,6 +67,11 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("getMemUtilization\n");
   }
 
+  int16_t startLeaderElection() {
+    // Your implementation goes here
+    printf("startLeaderElection\n");
+  }
+
   bool stateExists(const std::string& name) {
     // Your implementation goes here
     printf("stateExists\n");

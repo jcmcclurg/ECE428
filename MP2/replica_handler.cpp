@@ -14,7 +14,7 @@ Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> r
 	DEBUG( "Initialized RM " << myid );
 }
 
-int Replica::startLeaderElection(void) {
+int16_t Replica::startLeaderElection(void) {
 	// FIXME: Do actual leader election.
 	DEBUG( "RM " << id << " started leader election...Returned 0" );
 	return 0;
@@ -30,27 +30,19 @@ void Replica::checkExists(const string &name) const throw (ReplicaError) {
 	}
 }
 
-std::vector<int> Replica::findReplicaManagers(const string& name){
-	std::vector<int> v;
-	for(int i=0; i< (*replicas).numReplicas(); i++){
-		if((*replicas)[i].stateExists(name)){
-			v.push_back(i);
-		}
-	}
-	return v;
-}
-
-void Replica::reshuffleReplicas(const std::string& name){
+void Replica::reshuffleReplicas(const std::string& name, const std::string& val){
 	bool done;
+	bool found = false;
 	do{
 		done = true;
 		for(int i=0; i< (*replicas).numReplicas(); i++){
 			if((*replicas)[i].stateExists(name) && (*replicas)[i].getMemUtilization() > 1){
+				found = true;
 				for(int j=0; j< (*replicas).numReplicas(); j++){
 					if(!(*replicas)[j].stateExists(name) && (*replicas)[j].getMemUtilization() < (*replicas)[i].getMemUtilization()-1){
-						std::string ret;
-						(*replicas)[i].getState(ret,name);
-						(*replicas)[j].create(name,ret);
+						//std::string ret;
+						//(*replicas)[i].getState(ret,name);
+						(*replicas)[j].create(name,val);
 						(*replicas)[i].remove(name);
 						done = false;
 						break;
@@ -58,55 +50,55 @@ void Replica::reshuffleReplicas(const std::string& name){
 				}
 			}
 		}
+		if(!found){
+			ReplicaError error;
+			error.type = ErrorType::NOT_FOUND;
+			error.name = name;
+			error.message = string("Cannot find machine ") + name;
+			throw error;
+		}
 	} while(!done);
 }
 
-void Replica::createReplicas(const std::string& name){
+void Replica::createReplicas(const std::string& name, const std::string& val){
 	int count;
 	do{
-		int bm = INT_MAX;
-		int bmi;
-/*		int qm = INT_MAX;
-		int qmi;
-		int mm = INT_MAX;
-		int mmi;
-*/
 		int bm2 = INT_MAX;
 		int bmi2;
-/*		int qm2 = INT_MAX;
-		int qmi2;
-		int mm2 = INT_MAX;
-		int mmi2;
-*/
 		count = 0;
 		// Find optimal locations to store and copy from
 		for(int i=0; i< (*replicas).numReplicas(); i++){
 			int b = (*replicas)[i].getBwUtilization();
-//			int q = (*replicas)[i].getQueueLen();
-//			int m = (*replicas)[i].getMemUtilization();
 			if((*replicas)[i].stateExists(name)){
 				count++;
-				if(b < bm){ bmi = i; bm = b; }
-//				if(q < qm){ qmi = i; qm = q; }
-//				if(m < mm){ mmi = i; mm = m; }
 			}
 			else{
+				if((*replicas)[i].getMemUtilization() == 0){
+					bm2 = i;
+					break;
+				}
 				if(b < bm2){ bmi2 = i; bm2 = b; }
-//				if(q < qm2){ qmi2 = i; qm2 = q; }
-//				if(m < mm2){ mmi2 = i; mm2 = m; }
 			}
 		}
+		if(count == 0){
+			ReplicaError error;
+			error.type = ErrorType::NOT_FOUND;
+			error.name = name;
+			error.message = string("Cannot find machine ") + name;
+			throw error;
+		}
+		
 		if(count < MIN_REPLICAS){
-			// For now, we only do a very simple cost function, but the other
-			// variables are there for the future if need be.
-			std::string ret;
-			(*replicas)[bm].getState(ret,name);
-			(*replicas)[bm2].create(name,ret);
+			//(*replicas)[bm].getState(ret,name);
+			(*replicas)[bm2].create(name,val);
 			count++;
 		}
 	}while(count < MIN_REPLICAS);
 }
 int16_t Replica::getLeader(void){
+	if(leader == -1){
+		leader = startLeaderElection();
+	}
 	return leader;
 }
 int16_t Replica::getQueueLen(void){
@@ -171,6 +163,11 @@ void Replica::create(const string & name, const string & initialState) {
 	memUtilization++;
  	machines.insert(make_pair(name, factory.make(initialState)));
 	queueLen--;
+
+//	if(id == leader){
+//		createReplicas(name, initialState);
+//		reshuffleReplicas(name, initialState);
+//	}
 }
 
 void Replica::apply(string & result, const string & name, const string& operation) {

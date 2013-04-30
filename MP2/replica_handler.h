@@ -30,6 +30,7 @@ public:
 	int16_t getQueueLen(void);
 	int16_t getBwUtilization(void);
 	int16_t getMemUtilization(void);
+ 	int16_t startLeaderElection(void);
 	bool stateExists(const std::string& name);
 
 	virtual void exit(void);
@@ -45,16 +46,13 @@ private:
  	void checkExists(const std::string & name) const throw (ReplicaError);
  	// add any private methods and variables you need below. 
 
- 	// starts a leader election. If there is no current leader, shuts down entire RM functionality until completed. Returns the ID of the new leader.
  	int leader;
 	int queueLen;
 	int bwUtilization;
 	int memUtilization;
 	bool electionInProgress;
- 	int startLeaderElection(void);
-	std::vector<int> findReplicaManagers(const std::string& name);
-	void createReplicas(const std::string& name);
-	void reshuffleReplicas(const std::string& name);
+	void createReplicas(const std::string& name, const std::string& val);
+	void reshuffleReplicas(const std::string& name, const std::string& val);
 };
 
 } // namespace mp2 

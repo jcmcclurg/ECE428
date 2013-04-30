@@ -31,6 +31,7 @@ service Replica {
 	i16 getQueueLen(),
 	i16 getBwUtilization(),
 	i16 getMemUtilization(),
+	i16 startLeaderElection(),
 	bool stateExists(1: string name),
 
 	// exit / crash

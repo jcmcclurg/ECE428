@@ -24,6 +24,7 @@ class ReplicaIf {
   virtual int16_t getQueueLen() = 0;
   virtual int16_t getBwUtilization() = 0;
   virtual int16_t getMemUtilization() = 0;
+  virtual int16_t startLeaderElection() = 0;
   virtual bool stateExists(const std::string& name) = 0;
   virtual void exit() = 0;
 };
@@ -84,6 +85,10 @@ class ReplicaNull : virtual public ReplicaIf {
     return _return;
   }
   int16_t getMemUtilization() {
+    int16_t _return = 0;
+    return _return;
+  }
+  int16_t startLeaderElection() {
     int16_t _return = 0;
     return _return;
   }
@@ -1060,6 +1065,100 @@ class Replica_getMemUtilization_presult {
 
 };
 
+
+class Replica_startLeaderElection_args {
+ public:
+
+  Replica_startLeaderElection_args() {
+  }
+
+  virtual ~Replica_startLeaderElection_args() throw() {}
+
+
+  bool operator == (const Replica_startLeaderElection_args & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_startLeaderElection_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_startLeaderElection_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_startLeaderElection_pargs {
+ public:
+
+
+  virtual ~Replica_startLeaderElection_pargs() throw() {}
+
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_startLeaderElection_result__isset {
+  _Replica_startLeaderElection_result__isset() : success(false) {}
+  bool success;
+} _Replica_startLeaderElection_result__isset;
+
+class Replica_startLeaderElection_result {
+ public:
+
+  Replica_startLeaderElection_result() : success(0) {
+  }
+
+  virtual ~Replica_startLeaderElection_result() throw() {}
+
+  int16_t success;
+
+  _Replica_startLeaderElection_result__isset __isset;
+
+  void __set_success(const int16_t val) {
+    success = val;
+  }
+
+  bool operator == (const Replica_startLeaderElection_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_startLeaderElection_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_startLeaderElection_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Replica_startLeaderElection_presult__isset {
+  _Replica_startLeaderElection_presult__isset() : success(false) {}
+  bool success;
+} _Replica_startLeaderElection_presult__isset;
+
+class Replica_startLeaderElection_presult {
+ public:
+
+
+  virtual ~Replica_startLeaderElection_presult() throw() {}
+
+  int16_t* success;
+
+  _Replica_startLeaderElection_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _Replica_stateExists_args__isset {
   _Replica_stateExists_args__isset() : name(false) {}
   bool name;
@@ -1252,6 +1351,9 @@ class ReplicaClient : virtual public ReplicaIf {
   int16_t getMemUtilization();
   void send_getMemUtilization();
   int16_t recv_getMemUtilization();
+  int16_t startLeaderElection();
+  void send_startLeaderElection();
+  int16_t recv_startLeaderElection();
   bool stateExists(const std::string& name);
   void send_stateExists(const std::string& name);
   bool recv_stateExists();
@@ -1281,6 +1383,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_getQueueLen(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getBwUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getMemUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_startLeaderElection(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_stateExists(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_exit(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
@@ -1295,6 +1398,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["getQueueLen"] = &ReplicaProcessor::process_getQueueLen;
     processMap_["getBwUtilization"] = &ReplicaProcessor::process_getBwUtilization;
     processMap_["getMemUtilization"] = &ReplicaProcessor::process_getMemUtilization;
+    processMap_["startLeaderElection"] = &ReplicaProcessor::process_startLeaderElection;
     processMap_["stateExists"] = &ReplicaProcessor::process_stateExists;
     processMap_["exit"] = &ReplicaProcessor::process_exit;
   }
@@ -1406,6 +1510,15 @@ class ReplicaMultiface : virtual public ReplicaIf {
       ifaces_[i]->getMemUtilization();
     }
     return ifaces_[i]->getMemUtilization();
+  }
+
+  int16_t startLeaderElection() {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->startLeaderElection();
+    }
+    return ifaces_[i]->startLeaderElection();
   }
 
   bool stateExists(const std::string& name) {

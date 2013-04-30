@@ -85,6 +85,65 @@ class ReplicaError : public ::apache::thrift::TException {
 
 void swap(ReplicaError &a, ReplicaError &b);
 
+typedef struct _Promise__isset {
+  _Promise__isset() : success(false), acceptedProposalNumber(false), acceptedProposalValue(false) {}
+  bool success;
+  bool acceptedProposalNumber;
+  bool acceptedProposalValue;
+} _Promise__isset;
+
+class Promise {
+ public:
+
+  static const char* ascii_fingerprint; // = "5C4D84321B3CBB236930D75F16BF3C14";
+  static const uint8_t binary_fingerprint[16]; // = {0x5C,0x4D,0x84,0x32,0x1B,0x3C,0xBB,0x23,0x69,0x30,0xD7,0x5F,0x16,0xBF,0x3C,0x14};
+
+  Promise() : success(0), acceptedProposalNumber(0), acceptedProposalValue(0) {
+  }
+
+  virtual ~Promise() throw() {}
+
+  bool success;
+  int32_t acceptedProposalNumber;
+  int32_t acceptedProposalValue;
+
+  _Promise__isset __isset;
+
+  void __set_success(const bool val) {
+    success = val;
+  }
+
+  void __set_acceptedProposalNumber(const int32_t val) {
+    acceptedProposalNumber = val;
+  }
+
+  void __set_acceptedProposalValue(const int32_t val) {
+    acceptedProposalValue = val;
+  }
+
+  bool operator == (const Promise & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    if (!(acceptedProposalNumber == rhs.acceptedProposalNumber))
+      return false;
+    if (!(acceptedProposalValue == rhs.acceptedProposalValue))
+      return false;
+    return true;
+  }
+  bool operator != (const Promise &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Promise & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(Promise &a, Promise &b);
+
 } // namespace
 
 #endif

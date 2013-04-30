@@ -12,6 +12,12 @@ exception ReplicaError {
 	3: string message	// formatted error
 }
 
+struct Promise {
+	1: bool success,
+	2: i32 acceptedProposalNumber,
+	3: i32 acceptedProposalValue
+}
+
 service Replica {
 	// create a state machine
 	void create(1:string name, 2:string initialState) throws (1:ReplicaError e),
@@ -33,6 +39,11 @@ service Replica {
 	i16 getMemUtilization(),
 	i16 startLeaderElection(),
 	bool stateExists(1: string name),
+
+	// paxos
+	Promise prepare(1: i32 n),
+	bool accept(1: i32 n, 2: i32 value),
+	oneway void inform(1: i32 value),
 
 	// exit / crash
 	oneway void exit()

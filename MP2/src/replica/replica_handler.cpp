@@ -9,15 +9,111 @@ using boost::shared_ptr;
 #include <iostream>
 #include "settings.h"
 
-Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> replicas) : leader(-1), factory(factory), id(myid), replicas(replicas), electionInProgress(false), queueLen(0), memUtilization(0), bwUtilization(0) {
+Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> replicas)
+		: id(myid), factory(factory), replicas(replicas), 
+		  leader(-1), queueLen(0), bwUtilization(0), memUtilization(0),
+		  proposalNumber(myid), acceptedProposalNumber(-1), acceptedProposalValue(-1),
+		  electionInProgress(false) {
+
 	// any initialization you need goes here
 	DEBUG( "Initialized RM " << myid );
 }
 
 int16_t Replica::startLeaderElection(void) {
-	// FIXME: Do actual leader election.
-	DEBUG( "RM " << id << " started leader election...Returned 0" );
+	// Send a prepare request to every other replica. Our quorum in this case is considered
+	// to be the entire set of replicas. Note that replicas serve all three roles
+	// simultaneously. Furthermore, since we are assuming non-Byzantine failures,
+	// the distinguished Learner is simply the Replica that begins the leader election process.
+
+	electionInProgress = true;
+
+	int numReplicas = replicas->numReplicas();
+	int promisedCount = 0;
+	int highestAcceptedValue = id; // Choose myself as the leader if no one objects.
+
+	// Ensures proposal numbers are distinct across all replicas.
+	proposalNumber += numReplicas;
+
+	for (int i = 0; i < numReplicas; ++i) {
+		if (i != id) {
+			Promise promise;
+			(*replicas)[i].prepare(promise, proposalNumber);
+
+			if (promise.success) {
+				promisedCount++;
+				if (promise.acceptedProposalValue > highestAcceptedValue) {
+					highestAcceptedValue = promise.acceptedProposalValue;
+				}
+			}
+		}
+	}
+
+	// Have enough Acceptors given me their unbreakable word?
+	if (promisedCount > numReplicas / 2) {
+		proposalNumber += numReplicas;
+
+		// Send out accept requests to all Acceptors.
+		int acceptedCount = 0;
+		for (int i = 0; i < numReplicas; ++i) {
+			if (i != id) {
+				bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
+				if (accepted) {
+					acceptedCount++;
+				}
+			}
+		}
+
+		if (acceptedCount > numReplicas / 2) {
+			// Leader elected! 
+			leader = highestAcceptedValue;
+
+			// Everyone else assumes a Learner role now.
+			for (int i = 0; i < numReplicas; ++i) {
+				if (i != id) {
+					(*replicas)[i].inform(leader);
+				}
+			}
+		}
+	}
+
+	electionInProgress = false;
+
 	return 0;
+}
+
+void Replica::prepare(Promise& _return, const int32_t n) {
+	electionInProgress = true;
+
+	if (n > highestProposalNumber) {
+		highestProposalNumber = n;
+		_return.success = true;
+		_return.acceptedProposalNumber = acceptedProposalNumber;
+		_return.acceptedProposalValue = acceptedProposalValue; 
+		return;
+	}
+	_return.success = false;
+	_return.acceptedProposalNumber = -1;
+	_return.acceptedProposalValue = -1;
+}
+
+bool Replica::accept(const int32_t n, const int32_t value) {
+	electionInProgress = true;
+
+	if (n > highestProposalNumber) {
+		acceptedProposalNumber = n;
+		acceptedProposalValue = value; 
+		return true;
+	}
+	return false;
+}
+
+// Normally, this is sent by Acceptors to Learners. But since we have a single
+// distinguished Learner who decides if a majority of the Quorum (all the replicas here)
+// has accepted a value, we are guaranteed that this method is only called post-election.
+void Replica::inform(const int32_t value) {
+	electionInProgress = false;
+
+	leader = value;
 }
 
 void Replica::checkExists(const string &name) const throw (ReplicaError) {

@@ -112,4 +112,92 @@ void swap(ReplicaError &a, ReplicaError &b) {
   swap(a.__isset, b.__isset);
 }
 
+const char* Promise::ascii_fingerprint = "5C4D84321B3CBB236930D75F16BF3C14";
+const uint8_t Promise::binary_fingerprint[16] = {0x5C,0x4D,0x84,0x32,0x1B,0x3C,0xBB,0x23,0x69,0x30,0xD7,0x5F,0x16,0xBF,0x3C,0x14};
+
+uint32_t Promise::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->success);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->acceptedProposalNumber);
+          this->__isset.acceptedProposalNumber = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->acceptedProposalValue);
+          this->__isset.acceptedProposalValue = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t Promise::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("Promise");
+
+  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
+  xfer += oprot->writeBool(this->success);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("acceptedProposalNumber", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(this->acceptedProposalNumber);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("acceptedProposalValue", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->acceptedProposalValue);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(Promise &a, Promise &b) {
+  using ::std::swap;
+  swap(a.success, b.success);
+  swap(a.acceptedProposalNumber, b.acceptedProposalNumber);
+  swap(a.acceptedProposalValue, b.acceptedProposalValue);
+  swap(a.__isset, b.__isset);
+}
+
 } // namespace

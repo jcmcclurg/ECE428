@@ -34,6 +34,10 @@ public:
  	int16_t startLeaderElection(void);
 	bool stateExists(const std::string& name);
 
+  	virtual void prepare(Promise& _return, const int32_t n);
+  	virtual bool accept(const int32_t n, const int32_t value);
+  	virtual void inform(const int32_t value);
+
 	virtual void exit(void);
 
 private:
@@ -51,7 +55,14 @@ private:
 	int queueLen;
 	int bwUtilization;
 	int memUtilization;
+
+	// paxos
+	int proposalNumber;
+	int highestProposalNumber;
+	int acceptedProposalNumber;
+	int acceptedProposalValue;
 	bool electionInProgress;
+
 	void createReplicas(const std::string& name, const std::string& val);
 	void reshuffleReplicas(const std::string& name, const std::string& val);
 };

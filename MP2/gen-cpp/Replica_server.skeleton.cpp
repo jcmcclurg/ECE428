@@ -77,6 +77,21 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("stateExists\n");
   }
 
+  void prepare(Promise& _return, const int32_t n) {
+    // Your implementation goes here
+    printf("prepare\n");
+  }
+
+  bool accept(const int32_t n, const int32_t value) {
+    // Your implementation goes here
+    printf("accept\n");
+  }
+
+  void inform(const int32_t value) {
+    // Your implementation goes here
+    printf("inform\n");
+  }
+
   void exit() {
     // Your implementation goes here
     printf("exit\n");

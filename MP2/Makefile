@@ -11,6 +11,11 @@ TESTSOURCES:=$(wildcard test/*.cpp)
 TESTOBJS:=$(patsubst %.cpp,%.o,$(TESTSOURCES))
 TESTS:=$(patsubst test/%,%,$(patsubst %.cpp,%,$(TESTSOURCES)))
 
+FUNCSOURCES:=$(wildcard functional/*.cpp)
+FUNCOBJS:=$(patsubst %.cpp,%.o,$(FUNCSOURCES))
+
+REPLICAOBJS=src/replica/replica_handler.o src/replica/replicas.o
+
 RPCSOURCES=gen-cpp/replica_constants.cpp gen-cpp/replica_types.cpp gen-cpp/Replica.cpp
 RPCHEADERS:=$(patsubst %.cpp,%.h,$(RPCSOURCES))
 RPCOBJS:=$(patsubst %.cpp,%.o,$(RPCSOURCES))
@@ -20,19 +25,22 @@ LDFLAGS=-L$(THRIFT_DIR)/lib -lpthread -lthrift -lboost_program_options-mt -lboos
 .PHONY: all test clean
 all: replica client
 
-replica: src/replica/replica_handler.o src/replica/replica_main.o src/replica/replicas.o $(RPCOBJS)
+replica: $(REPLICAOBJS) src/replica/replica_main.o $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
-
+ 
 client: src/client/client.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
-
-replicas_unittest: test/replicas_unittest.o src/replica/replica_handler.o src/replica/replicas.o $(RPCOBJS) gtest_main.a
+ 
+replicas_unittest: test/replicas_unittest.o $(REPLICAOBJS) $(RPCOBJS) gtest_main.a
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
 stringmachine_unittest: test/stringmachine_unittest.o gtest_main.a
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
 bankbalance_unittest: test/bankbalance_unittest.o gtest_main.a
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+
+functional: $(FUNCOBJS) $(REPLICAOBJS) $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
 tests: $(TESTS)

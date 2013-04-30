@@ -78,7 +78,7 @@ int16_t Replica::startLeaderElection(void) {
 
 	electionInProgress = false;
 
-	return 0;
+	return leader;
 }
 
 void Replica::prepare(Promise& _return, const int32_t n) {

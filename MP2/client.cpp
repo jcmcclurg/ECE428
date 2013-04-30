@@ -1,5 +1,6 @@
 #include "frontend.h"
 #include "replicas.h"
+#include "settings.h"
 
 #include <iostream>
 

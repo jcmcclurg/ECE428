@@ -1,7 +1,5 @@
 GTEST_DIR=lib/gtest-1.6.0
 THRIFT_DIR=/usr/local
-# GTEST_DIR=/class/ece428/libs/gtest-1.6.0
-# THRIFT_DIR=/class/ece428/libs
 THRIFT=$(THRIFT_DIR)/bin/thrift
 CFLAGS=-I./gen-cpp -g 
 CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift \
@@ -20,7 +18,7 @@ RPCSOURCES=gen-cpp/replica_constants.cpp gen-cpp/replica_types.cpp gen-cpp/Repli
 RPCHEADERS:=$(patsubst %.cpp,%.h,$(RPCSOURCES))
 RPCOBJS:=$(patsubst %.cpp,%.o,$(RPCSOURCES))
 
-LDFLAGS=-L$(THRIFT_DIR)/lib -lpthread -lthrift -lboost_program_options-mt -lboost_filesystem-mt -lboost_system-mt
+LDFLAGS=-L$(THRIFT_DIR)/lib -lpthread -lthrift -lboost_program_options-mt -lboost_filesystem-mt -lboost_system-mt -lboost_thread-mt
 
 .PHONY: all test clean
 all: replica client

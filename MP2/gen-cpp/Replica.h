@@ -17,15 +17,16 @@ class ReplicaIf {
   virtual ~ReplicaIf() {}
   virtual void create(const std::string& name, const std::string& initialState) = 0;
   virtual void apply(std::string& _return, const std::string& name, const std::string& operation) = 0;
-  virtual void getState(std::string& _return, const std::string& name) = 0;
+  virtual void getState(std::string& _return, const int16_t client, const std::string& name) = 0;
   virtual void remove(const std::string& name) = 0;
-  virtual int16_t prepareGetState(const std::string& name) = 0;
+  virtual int16_t prepareGetState(const int16_t client, const std::string& name) = 0;
   virtual int16_t getLeader() = 0;
   virtual int16_t getQueueLen() = 0;
   virtual int16_t getBwUtilization() = 0;
   virtual int16_t getMemUtilization() = 0;
   virtual int16_t startLeaderElection() = 0;
   virtual bool stateExists(const std::string& name) = 0;
+  virtual void notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name) = 0;
   virtual void prepare(Promise& _return, const int32_t n) = 0;
   virtual bool accept(const int32_t n, const int32_t value) = 0;
   virtual void inform(const int32_t value) = 0;
@@ -65,13 +66,13 @@ class ReplicaNull : virtual public ReplicaIf {
   void apply(std::string& /* _return */, const std::string& /* name */, const std::string& /* operation */) {
     return;
   }
-  void getState(std::string& /* _return */, const std::string& /* name */) {
+  void getState(std::string& /* _return */, const int16_t /* client */, const std::string& /* name */) {
     return;
   }
   void remove(const std::string& /* name */) {
     return;
   }
-  int16_t prepareGetState(const std::string& /* name */) {
+  int16_t prepareGetState(const int16_t /* client */, const std::string& /* name */) {
     int16_t _return = 0;
     return _return;
   }
@@ -98,6 +99,9 @@ class ReplicaNull : virtual public ReplicaIf {
   bool stateExists(const std::string& /* name */) {
     bool _return = false;
     return _return;
+  }
+  void notifyFinishedReading(const int16_t /* rmid */, const int16_t /* client */, const std::string& /* name */) {
+    return;
   }
   void prepare(Promise& /* _return */, const int32_t /* n */) {
     return;
@@ -359,21 +363,27 @@ class Replica_apply_presult {
 };
 
 typedef struct _Replica_getState_args__isset {
-  _Replica_getState_args__isset() : name(false) {}
+  _Replica_getState_args__isset() : client(false), name(false) {}
+  bool client;
   bool name;
 } _Replica_getState_args__isset;
 
 class Replica_getState_args {
  public:
 
-  Replica_getState_args() : name() {
+  Replica_getState_args() : client(0), name() {
   }
 
   virtual ~Replica_getState_args() throw() {}
 
+  int16_t client;
   std::string name;
 
   _Replica_getState_args__isset __isset;
+
+  void __set_client(const int16_t val) {
+    client = val;
+  }
 
   void __set_name(const std::string& val) {
     name = val;
@@ -381,6 +391,8 @@ class Replica_getState_args {
 
   bool operator == (const Replica_getState_args & rhs) const
   {
+    if (!(client == rhs.client))
+      return false;
     if (!(name == rhs.name))
       return false;
     return true;
@@ -403,6 +415,7 @@ class Replica_getState_pargs {
 
   virtual ~Replica_getState_pargs() throw() {}
 
+  const int16_t* client;
   const std::string* name;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -585,21 +598,27 @@ class Replica_remove_presult {
 };
 
 typedef struct _Replica_prepareGetState_args__isset {
-  _Replica_prepareGetState_args__isset() : name(false) {}
+  _Replica_prepareGetState_args__isset() : client(false), name(false) {}
+  bool client;
   bool name;
 } _Replica_prepareGetState_args__isset;
 
 class Replica_prepareGetState_args {
  public:
 
-  Replica_prepareGetState_args() : name() {
+  Replica_prepareGetState_args() : client(0), name() {
   }
 
   virtual ~Replica_prepareGetState_args() throw() {}
 
+  int16_t client;
   std::string name;
 
   _Replica_prepareGetState_args__isset __isset;
+
+  void __set_client(const int16_t val) {
+    client = val;
+  }
 
   void __set_name(const std::string& val) {
     name = val;
@@ -607,6 +626,8 @@ class Replica_prepareGetState_args {
 
   bool operator == (const Replica_prepareGetState_args & rhs) const
   {
+    if (!(client == rhs.client))
+      return false;
     if (!(name == rhs.name))
       return false;
     return true;
@@ -629,6 +650,7 @@ class Replica_prepareGetState_pargs {
 
   virtual ~Replica_prepareGetState_pargs() throw() {}
 
+  const int16_t* client;
   const std::string* name;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -636,9 +658,8 @@ class Replica_prepareGetState_pargs {
 };
 
 typedef struct _Replica_prepareGetState_result__isset {
-  _Replica_prepareGetState_result__isset() : success(false), e(false) {}
+  _Replica_prepareGetState_result__isset() : success(false) {}
   bool success;
-  bool e;
 } _Replica_prepareGetState_result__isset;
 
 class Replica_prepareGetState_result {
@@ -650,7 +671,6 @@ class Replica_prepareGetState_result {
   virtual ~Replica_prepareGetState_result() throw() {}
 
   int16_t success;
-  ReplicaError e;
 
   _Replica_prepareGetState_result__isset __isset;
 
@@ -658,15 +678,9 @@ class Replica_prepareGetState_result {
     success = val;
   }
 
-  void __set_e(const ReplicaError& val) {
-    e = val;
-  }
-
   bool operator == (const Replica_prepareGetState_result & rhs) const
   {
     if (!(success == rhs.success))
-      return false;
-    if (!(e == rhs.e))
       return false;
     return true;
   }
@@ -682,9 +696,8 @@ class Replica_prepareGetState_result {
 };
 
 typedef struct _Replica_prepareGetState_presult__isset {
-  _Replica_prepareGetState_presult__isset() : success(false), e(false) {}
+  _Replica_prepareGetState_presult__isset() : success(false) {}
   bool success;
-  bool e;
 } _Replica_prepareGetState_presult__isset;
 
 class Replica_prepareGetState_presult {
@@ -694,7 +707,6 @@ class Replica_prepareGetState_presult {
   virtual ~Replica_prepareGetState_presult() throw() {}
 
   int16_t* success;
-  ReplicaError e;
 
   _Replica_prepareGetState_presult__isset __isset;
 
@@ -1280,6 +1292,112 @@ class Replica_stateExists_presult {
 
 };
 
+typedef struct _Replica_notifyFinishedReading_args__isset {
+  _Replica_notifyFinishedReading_args__isset() : rmid(false), client(false), name(false) {}
+  bool rmid;
+  bool client;
+  bool name;
+} _Replica_notifyFinishedReading_args__isset;
+
+class Replica_notifyFinishedReading_args {
+ public:
+
+  Replica_notifyFinishedReading_args() : rmid(0), client(0), name() {
+  }
+
+  virtual ~Replica_notifyFinishedReading_args() throw() {}
+
+  int16_t rmid;
+  int16_t client;
+  std::string name;
+
+  _Replica_notifyFinishedReading_args__isset __isset;
+
+  void __set_rmid(const int16_t val) {
+    rmid = val;
+  }
+
+  void __set_client(const int16_t val) {
+    client = val;
+  }
+
+  void __set_name(const std::string& val) {
+    name = val;
+  }
+
+  bool operator == (const Replica_notifyFinishedReading_args & rhs) const
+  {
+    if (!(rmid == rhs.rmid))
+      return false;
+    if (!(client == rhs.client))
+      return false;
+    if (!(name == rhs.name))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_notifyFinishedReading_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_notifyFinishedReading_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_notifyFinishedReading_pargs {
+ public:
+
+
+  virtual ~Replica_notifyFinishedReading_pargs() throw() {}
+
+  const int16_t* rmid;
+  const int16_t* client;
+  const std::string* name;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_notifyFinishedReading_result {
+ public:
+
+  Replica_notifyFinishedReading_result() {
+  }
+
+  virtual ~Replica_notifyFinishedReading_result() throw() {}
+
+
+  bool operator == (const Replica_notifyFinishedReading_result & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_notifyFinishedReading_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_notifyFinishedReading_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_notifyFinishedReading_presult {
+ public:
+
+
+  virtual ~Replica_notifyFinishedReading_presult() throw() {}
+
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _Replica_prepare_args__isset {
   _Replica_prepare_args__isset() : n(false) {}
   bool n;
@@ -1619,14 +1737,14 @@ class ReplicaClient : virtual public ReplicaIf {
   void apply(std::string& _return, const std::string& name, const std::string& operation);
   void send_apply(const std::string& name, const std::string& operation);
   void recv_apply(std::string& _return);
-  void getState(std::string& _return, const std::string& name);
-  void send_getState(const std::string& name);
+  void getState(std::string& _return, const int16_t client, const std::string& name);
+  void send_getState(const int16_t client, const std::string& name);
   void recv_getState(std::string& _return);
   void remove(const std::string& name);
   void send_remove(const std::string& name);
   void recv_remove();
-  int16_t prepareGetState(const std::string& name);
-  void send_prepareGetState(const std::string& name);
+  int16_t prepareGetState(const int16_t client, const std::string& name);
+  void send_prepareGetState(const int16_t client, const std::string& name);
   int16_t recv_prepareGetState();
   int16_t getLeader();
   void send_getLeader();
@@ -1646,6 +1764,9 @@ class ReplicaClient : virtual public ReplicaIf {
   bool stateExists(const std::string& name);
   void send_stateExists(const std::string& name);
   bool recv_stateExists();
+  void notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name);
+  void send_notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name);
+  void recv_notifyFinishedReading();
   void prepare(Promise& _return, const int32_t n);
   void send_prepare(const int32_t n);
   void recv_prepare(Promise& _return);
@@ -1682,6 +1803,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_getMemUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_startLeaderElection(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_stateExists(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_notifyFinishedReading(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_prepare(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_accept(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_inform(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -1700,6 +1822,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["getMemUtilization"] = &ReplicaProcessor::process_getMemUtilization;
     processMap_["startLeaderElection"] = &ReplicaProcessor::process_startLeaderElection;
     processMap_["stateExists"] = &ReplicaProcessor::process_stateExists;
+    processMap_["notifyFinishedReading"] = &ReplicaProcessor::process_notifyFinishedReading;
     processMap_["prepare"] = &ReplicaProcessor::process_prepare;
     processMap_["accept"] = &ReplicaProcessor::process_accept;
     processMap_["inform"] = &ReplicaProcessor::process_inform;
@@ -1751,13 +1874,13 @@ class ReplicaMultiface : virtual public ReplicaIf {
     return;
   }
 
-  void getState(std::string& _return, const std::string& name) {
+  void getState(std::string& _return, const int16_t client, const std::string& name) {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->getState(_return, name);
+      ifaces_[i]->getState(_return, client, name);
     }
-    ifaces_[i]->getState(_return, name);
+    ifaces_[i]->getState(_return, client, name);
     return;
   }
 
@@ -1770,13 +1893,13 @@ class ReplicaMultiface : virtual public ReplicaIf {
     ifaces_[i]->remove(name);
   }
 
-  int16_t prepareGetState(const std::string& name) {
+  int16_t prepareGetState(const int16_t client, const std::string& name) {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->prepareGetState(name);
+      ifaces_[i]->prepareGetState(client, name);
     }
-    return ifaces_[i]->prepareGetState(name);
+    return ifaces_[i]->prepareGetState(client, name);
   }
 
   int16_t getLeader() {
@@ -1831,6 +1954,15 @@ class ReplicaMultiface : virtual public ReplicaIf {
       ifaces_[i]->stateExists(name);
     }
     return ifaces_[i]->stateExists(name);
+  }
+
+  void notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->notifyFinishedReading(rmid, client, name);
+    }
+    ifaces_[i]->notifyFinishedReading(rmid, client, name);
   }
 
   void prepare(Promise& _return, const int32_t n) {

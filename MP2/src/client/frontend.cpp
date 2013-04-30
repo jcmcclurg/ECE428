@@ -37,8 +37,8 @@ public:
 			int leader = front->findLeader();
 			string result;
 			try{
-				int where = (*(front->replicas))[leader].prepareGetState(name);
-				(*(front->replicas))[where].getState(result,name);
+				int where = (*(front->replicas))[leader].prepareGetState(front->id,name);
+				(*(front->replicas))[where].getState(result,front->id,name);
 				return result;
 			}catch(ReplicaError e){ DEBUG(e.message); }
 		}

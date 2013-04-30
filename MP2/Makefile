@@ -1,5 +1,7 @@
 GTEST_DIR=lib/gtest-1.6.0
 THRIFT_DIR=/usr/local
+# GTEST_DIR=/class/ece428/libs/gtest-1.6.0
+# THRIFT_DIR=/class/ece428/libs
 THRIFT=$(THRIFT_DIR)/bin/thrift
 CFLAGS=-I./gen-cpp -g 
 CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift \
@@ -7,6 +9,7 @@ CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DI
 
 TESTSOURCES:=$(wildcard test/*.cpp)
 TESTOBJS:=$(patsubst %.cpp,%.o,$(TESTSOURCES))
+TESTS:=$(patsubst test/%,%,$(patsubst %.cpp,%,$(TESTSOURCES)))
 
 RPCSOURCES=gen-cpp/replica_constants.cpp gen-cpp/replica_types.cpp gen-cpp/Replica.cpp
 RPCHEADERS:=$(patsubst %.cpp,%.h,$(RPCSOURCES))
@@ -23,8 +26,20 @@ replica: src/replica/replica_handler.o src/replica/replica_main.o src/replica/re
 client: src/client/client.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
-test: test/replicas.o src/replica/replica_handler.o src/replica/replica_main.o src/replica/replicas.o  gtest_main.a
-	$(CXX) $(CXXFLAGS) -pthread $^ -o bin/$@
+replicas_unittest: test/replicas_unittest.o src/replica/replica_handler.o src/replica/replicas.o $(RPCOBJS) gtest_main.a
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+
+stringmachine_unittest: test/stringmachine_unittest.o gtest_main.a
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+
+bankbalance_unittest: test/bankbalance_unittest.o gtest_main.a
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+
+tests: $(TESTS)
+	@for test in $^; do \
+		./bin/$$test ; \
+	done
+
 
 .PHONY: thrift
 thrift: 
@@ -56,7 +71,7 @@ gtest_main.a: gtest-all.o gtest_main.o
 	$(AR) $(ARFLAGS) $@ $^
 
 clean:
-	-rm -f bin/* .pipes/*
+	-rm -f bin/* bin/.pipes/*
 	find . -name "*.o" | xargs rm -f
 
 .PHONY: depend

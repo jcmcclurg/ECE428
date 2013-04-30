@@ -1,7 +1,7 @@
-#include "frontend.h"
-#include "replicas.h"
-
 #include <iostream>
+
+#include "frontend.h"
+#include "replica/replicas.h"
 
 using namespace mp2;
 using namespace std;

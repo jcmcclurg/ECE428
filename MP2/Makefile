@@ -1,37 +1,36 @@
 GTEST_DIR=lib/gtest-1.6.0
 THRIFT_DIR=/usr/local
 THRIFT=$(THRIFT_DIR)/bin/thrift
-CFLAGS=-I./gen-cpp -g
-CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift -I$(THRIFT_DIR)/include -Wall -Wextra -g
+CFLAGS=-I./gen-cpp -g 
+CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift \
+	-I$(THRIFT_DIR)/include -Wall -Wextra -g -DHAVE_NETINET_IN_H -DHAVE_INTTYPES_H
 
-REPLICA_SRCS:=$(wildcard src/replica/*.cpp)
-CLIENT_SRCS:=$(wildcard src/client/*.cpp)
-TEST_SRCS:=$(wildcard test/*.cpp)
+TESTSOURCES:=$(wildcard test/*.cpp)
+TESTOBJS:=$(patsubst %.cpp,%.o,$(TESTSOURCES))
 
-RPC_SRCS:=$(gen-cpp/*.cpp)
-RPCHEADERS:=$(patsubst %.cpp, %.h, $(RPC_SRCS))
-RPCOBJS:=$(patsubst %.cpp, %.o, $(RPC_SRCS))
+RPCSOURCES=gen-cpp/replica_constants.cpp gen-cpp/replica_types.cpp gen-cpp/Replica.cpp
+RPCHEADERS:=$(patsubst %.cpp,%.h,$(RPCSOURCES))
+RPCOBJS:=$(patsubst %.cpp,%.o,$(RPCSOURCES))
 
 LDFLAGS=-L$(THRIFT_DIR)/lib -lpthread -lthrift -lboost_program_options-mt -lboost_filesystem-mt -lboost_system-mt
 
 .PHONY: all test clean
 all: replica client
 
-replica: $(REPLICA_SRCS) $(RPCOBJS)
-	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+replica: src/replica/replica_handler.o src/replica/replica_main.o src/replica/replicas.o $(RPCOBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
-client: $(CLIENT_SRCS) $(RPCOBJS) replicas.o 
-	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+client: src/client/client.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
 
-test: $(TEST_SRCS) gtest_main.a
-	$(CXX) $(CXXFLAGS) $^ -lpthread -o bin/$@
+test: test/replicas.o src/replica/replica_handler.o src/replica/replica_main.o src/replica/replicas.o  gtest_main.a
+	$(CXX) $(CXXFLAGS) -pthread $^ -o bin/$@
 
 .PHONY: thrift
 thrift: 
-	$(THRIFT) -gen cpp replica.thrift
+	$(THRIFT) -gen cpp src/replica/replica.thrift
 
-$(RPCSOURCES) $(RPCHEADERS): replica.thrift
-	echo aldkfjlad
+$(RPCSOURCES) $(RPCHEADERS): src/replica/replica.thrift
 	$(THRIFT) -gen cpp $^
 
 # Builds gtest.a and gtest_main.a.
@@ -57,7 +56,8 @@ gtest_main.a: gtest-all.o gtest_main.o
 	$(AR) $(ARFLAGS) $@ $^
 
 clean:
-	-rm -f *.o gen-cpp/*.o $(TESTS) replica client .pipes/*
+	-rm -f bin/* .pipes/*
+	find . -name "*.o" | xargs rm -f
 
 .PHONY: depend
 depend: .depend

@@ -1,7 +1,7 @@
 #include "Replica.h"
 
 #include "replica_handler.h"
-#include "models/stringmachine.h"
+#include "model/stringmachine.h"
 #include "replicas.h"
 
 using namespace std;

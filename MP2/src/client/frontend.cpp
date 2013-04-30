@@ -1,8 +1,10 @@
-#include "frontend.h"
-#include <boost/shared_ptr.hpp>
-#include "statemachine.h"
-#include "settings.h"
 #include <time.h>
+#include <boost/shared_ptr.hpp>
+
+#include "frontend.h"
+#include "model/statemachine.h"
+#include "settings.h"
+
 
 using namespace std;
 using namespace mp2;

@@ -6,7 +6,7 @@
 
 #include "Replica.h"
 
-#include "models/statemachine.h"
+#include "model/statemachine.h"
 #include "replicas.h"
 
 namespace mp2 {

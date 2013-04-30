@@ -4,7 +4,7 @@
 #include <string>
 #include <boost/shared_ptr.hpp>
 
-#include "models/statemachine.h"
+#include "model/statemachine.h"
 #include "replicas/replicas.h"
 
 namespace mp2 {

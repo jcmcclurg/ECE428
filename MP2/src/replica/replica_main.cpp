@@ -3,6 +3,7 @@
 #include "replica_handler.h"
 #include "model/stringmachine.h"
 #include "replicas.h"
+#include "settings.h"
 
 using namespace std;
 using namespace mp2;
@@ -16,6 +17,7 @@ int main(int argc, char **argv) {
 
 	StringMachineFactory factory;
 	shared_ptr<Replica> replica(new Replica(myid, factory, replicas));
+	DEBUG("Initialized replica connector.");
 
 	replicas->serve(replica, myid);
 

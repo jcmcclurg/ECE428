@@ -405,6 +405,14 @@ uint32_t Replica_getState_args::read(::apache::thrift::protocol::TProtocol* ipro
     switch (fid)
     {
       case 1:
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16(this->client);
+          this->__isset.client = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->name);
           this->__isset.name = true;
@@ -428,7 +436,11 @@ uint32_t Replica_getState_args::write(::apache::thrift::protocol::TProtocol* opr
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("Replica_getState_args");
 
-  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16(this->client);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->name);
   xfer += oprot->writeFieldEnd();
 
@@ -441,7 +453,11 @@ uint32_t Replica_getState_pargs::write(::apache::thrift::protocol::TProtocol* op
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("Replica_getState_pargs");
 
-  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16((*(this->client)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString((*(this->name)));
   xfer += oprot->writeFieldEnd();
 
@@ -749,6 +765,14 @@ uint32_t Replica_prepareGetState_args::read(::apache::thrift::protocol::TProtoco
     switch (fid)
     {
       case 1:
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16(this->client);
+          this->__isset.client = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->name);
           this->__isset.name = true;
@@ -772,7 +796,11 @@ uint32_t Replica_prepareGetState_args::write(::apache::thrift::protocol::TProtoc
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("Replica_prepareGetState_args");
 
-  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16(this->client);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->name);
   xfer += oprot->writeFieldEnd();
 
@@ -785,7 +813,11 @@ uint32_t Replica_prepareGetState_pargs::write(::apache::thrift::protocol::TProto
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("Replica_prepareGetState_pargs");
 
-  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16((*(this->client)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString((*(this->name)));
   xfer += oprot->writeFieldEnd();
 
@@ -822,14 +854,6 @@ uint32_t Replica_prepareGetState_result::read(::apache::thrift::protocol::TProto
           xfer += iprot->skip(ftype);
         }
         break;
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->e.read(iprot);
-          this->__isset.e = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -851,10 +875,6 @@ uint32_t Replica_prepareGetState_result::write(::apache::thrift::protocol::TProt
   if (this->__isset.success) {
     xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_I16, 0);
     xfer += oprot->writeI16(this->success);
-    xfer += oprot->writeFieldEnd();
-  } else if (this->__isset.e) {
-    xfer += oprot->writeFieldBegin("e", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->e.write(oprot);
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();
@@ -886,14 +906,6 @@ uint32_t Replica_prepareGetState_presult::read(::apache::thrift::protocol::TProt
         if (ftype == ::apache::thrift::protocol::T_I16) {
           xfer += iprot->readI16((*(this->success)));
           this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-          xfer += this->e.read(iprot);
-          this->__isset.e = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -1777,6 +1789,169 @@ uint32_t Replica_stateExists_presult::read(::apache::thrift::protocol::TProtocol
   return xfer;
 }
 
+uint32_t Replica_notifyFinishedReading_args::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16(this->rmid);
+          this->__isset.rmid = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16(this->client);
+          this->__isset.client = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->name);
+          this->__isset.name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t Replica_notifyFinishedReading_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("Replica_notifyFinishedReading_args");
+
+  xfer += oprot->writeFieldBegin("rmid", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16(this->rmid);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 2);
+  xfer += oprot->writeI16(this->client);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+uint32_t Replica_notifyFinishedReading_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("Replica_notifyFinishedReading_pargs");
+
+  xfer += oprot->writeFieldBegin("rmid", ::apache::thrift::protocol::T_I16, 1);
+  xfer += oprot->writeI16((*(this->rmid)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("client", ::apache::thrift::protocol::T_I16, 2);
+  xfer += oprot->writeI16((*(this->client)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString((*(this->name)));
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+uint32_t Replica_notifyFinishedReading_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    xfer += iprot->skip(ftype);
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t Replica_notifyFinishedReading_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("Replica_notifyFinishedReading_result");
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+uint32_t Replica_notifyFinishedReading_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    xfer += iprot->skip(ftype);
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
 uint32_t Replica_prepare_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   uint32_t xfer = 0;
@@ -2347,18 +2522,19 @@ void ReplicaClient::recv_apply(std::string& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "apply failed: unknown result");
 }
 
-void ReplicaClient::getState(std::string& _return, const std::string& name)
+void ReplicaClient::getState(std::string& _return, const int16_t client, const std::string& name)
 {
-  send_getState(name);
+  send_getState(client, name);
   recv_getState(_return);
 }
 
-void ReplicaClient::send_getState(const std::string& name)
+void ReplicaClient::send_getState(const int16_t client, const std::string& name)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("getState", ::apache::thrift::protocol::T_CALL, cseqid);
 
   Replica_getState_pargs args;
+  args.client = &client;
   args.name = &name;
   args.write(oprot_);
 
@@ -2464,18 +2640,19 @@ void ReplicaClient::recv_remove()
   return;
 }
 
-int16_t ReplicaClient::prepareGetState(const std::string& name)
+int16_t ReplicaClient::prepareGetState(const int16_t client, const std::string& name)
 {
-  send_prepareGetState(name);
+  send_prepareGetState(client, name);
   return recv_prepareGetState();
 }
 
-void ReplicaClient::send_prepareGetState(const std::string& name)
+void ReplicaClient::send_prepareGetState(const int16_t client, const std::string& name)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("prepareGetState", ::apache::thrift::protocol::T_CALL, cseqid);
 
   Replica_prepareGetState_pargs args;
+  args.client = &client;
   args.name = &name;
   args.write(oprot_);
 
@@ -2518,9 +2695,6 @@ int16_t ReplicaClient::recv_prepareGetState()
 
   if (result.__isset.success) {
     return _return;
-  }
-  if (result.__isset.e) {
-    throw result.e;
   }
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "prepareGetState failed: unknown result");
 }
@@ -2868,6 +3042,61 @@ bool ReplicaClient::recv_stateExists()
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "stateExists failed: unknown result");
 }
 
+void ReplicaClient::notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name)
+{
+  send_notifyFinishedReading(rmid, client, name);
+  recv_notifyFinishedReading();
+}
+
+void ReplicaClient::send_notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("notifyFinishedReading", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  Replica_notifyFinishedReading_pargs args;
+  args.rmid = &rmid;
+  args.client = &client;
+  args.name = &name;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void ReplicaClient::recv_notifyFinishedReading()
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("notifyFinishedReading") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  Replica_notifyFinishedReading_presult result;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  return;
+}
+
 void ReplicaClient::prepare(Promise& _return, const int32_t n)
 {
   send_prepare(n);
@@ -3177,7 +3406,7 @@ void ReplicaProcessor::process_getState(int32_t seqid, ::apache::thrift::protoco
 
   Replica_getState_result result;
   try {
-    iface_->getState(result.success, args.name);
+    iface_->getState(result.success, args.client, args.name);
     result.__isset.success = true;
   } catch (ReplicaError &e) {
     result.e = e;
@@ -3290,11 +3519,8 @@ void ReplicaProcessor::process_prepareGetState(int32_t seqid, ::apache::thrift::
 
   Replica_prepareGetState_result result;
   try {
-    result.success = iface_->prepareGetState(args.name);
+    result.success = iface_->prepareGetState(args.client, args.name);
     result.__isset.success = true;
-  } catch (ReplicaError &e) {
-    result.e = e;
-    result.__isset.e = true;
   } catch (const std::exception& e) {
     if (this->eventHandler_.get() != NULL) {
       this->eventHandler_->handlerError(ctx, "Replica.prepareGetState");
@@ -3645,6 +3871,59 @@ void ReplicaProcessor::process_stateExists(int32_t seqid, ::apache::thrift::prot
 
   if (this->eventHandler_.get() != NULL) {
     this->eventHandler_->postWrite(ctx, "Replica.stateExists", bytes);
+  }
+}
+
+void ReplicaProcessor::process_notifyFinishedReading(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = NULL;
+  if (this->eventHandler_.get() != NULL) {
+    ctx = this->eventHandler_->getContext("Replica.notifyFinishedReading", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "Replica.notifyFinishedReading");
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->preRead(ctx, "Replica.notifyFinishedReading");
+  }
+
+  Replica_notifyFinishedReading_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->postRead(ctx, "Replica.notifyFinishedReading", bytes);
+  }
+
+  Replica_notifyFinishedReading_result result;
+  try {
+    iface_->notifyFinishedReading(args.rmid, args.client, args.name);
+  } catch (const std::exception& e) {
+    if (this->eventHandler_.get() != NULL) {
+      this->eventHandler_->handlerError(ctx, "Replica.notifyFinishedReading");
+    }
+
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("notifyFinishedReading", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
+    oprot->writeMessageEnd();
+    oprot->getTransport()->writeEnd();
+    oprot->getTransport()->flush();
+    return;
+  }
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->preWrite(ctx, "Replica.notifyFinishedReading");
+  }
+
+  oprot->writeMessageBegin("notifyFinishedReading", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->postWrite(ctx, "Replica.notifyFinishedReading", bytes);
   }
 }
 

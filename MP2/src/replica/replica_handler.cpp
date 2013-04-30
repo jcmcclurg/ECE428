@@ -5,8 +5,11 @@ using namespace mp2;
 using namespace std;
 using boost::shared_ptr;
 
+#include <boost/format.hpp>
 #include <cstdlib>
 #include <iostream>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 #include "settings.h"
 
 Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> replicas)
@@ -20,6 +23,7 @@ Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> r
 }
 
 int16_t Replica::startLeaderElection(void) {
+	DEBUG( "RM " << id << " started a leader election.");
 	// Send a prepare request to every other replica. Our quorum in this case is considered
 	// to be the entire set of replicas. Note that replicas serve all three roles
 	// simultaneously. Furthermore, since we are assuming non-Byzantine failures,
@@ -100,6 +104,7 @@ bool Replica::accept(const int32_t n, const int32_t value) {
 	electionInProgress = true;
 
 	if (n > highestProposalNumber) {
+		DEBUG("Accepted value" << n << " for the leader election.");
 		acceptedProposalNumber = n;
 		acceptedProposalValue = value; 
 		return true;
@@ -182,7 +187,7 @@ void Replica::createReplicas(const std::string& name, const std::string& val){
 }
 int16_t Replica::getLeader(void){
 	if(leader == -1){
-		leader = startLeaderElection();
+		startLeaderElection();
 	}
 	// Ensure that the leader is still alive.
 	else if(leader != id){
@@ -190,7 +195,7 @@ int16_t Replica::getLeader(void){
 			leader = (*replicas)[leader].getLeader();
 		}
 		catch(ReplicaError){
-			leader = startLeaderElection();
+			startLeaderElection();
 		}
 	}
 	return leader;
@@ -205,7 +210,7 @@ int16_t Replica::getMemUtilization(void){
 	return memUtilization;
 }
 
-int16_t Replica::prepareGetState(const std::string& name){
+int16_t Replica::prepareGetState(int16_t client, const std::string& name){
 	if (id != leader){
 		ReplicaError error;
 		error.type = ErrorType::NOT_LEADER;
@@ -213,12 +218,29 @@ int16_t Replica::prepareGetState(const std::string& name){
 		error.message = string("Only the leader can prepare a get.");
 		throw error;
 	}
-	DEBUG("RM " << id << " (leader) responding to a prepare for " << name);
 
+	// Block until queue does not have any writes for this state.
+	DEBUG("Blocking until the queue is free from writes...");
+	while(true){
+		bool waitingOver = true;
+		for(std::vector<int>::size_type i = 0; i != requestQueue[name].size(); i++) {
+			if(requestQueue[name][i].first == 'w'){
+				waitingOver = false;
+				break;
+			}
+		}
+		if(waitingOver){
+			break;
+		}
+		boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+	}
+
+	DEBUG("RM " << id << " (leader) responding to a prepare for " << name);
 	int bm = INT_MAX;
 	int bmi;
 	bool success = false;
 
+	// Find the replica with the least bandwidth (for load balancing purposes)
 	for(int i=0; i< (*replicas).numReplicas(); i++){
 		try{
 		if((*replicas)[i].stateExists(name)){
@@ -235,10 +257,9 @@ int16_t Replica::prepareGetState(const std::string& name){
 		error.message = string("Cannot find machine ") + name;
 		throw error;
 	}
-	string s;
-	(*replicas)[(*replicas).numReplicas()-1].getState(s,name);
-	createReplicas(name, s);
-	reshuffleReplicas(name, s);
+
+	// Queue the read request.
+	requestQueue[name].push_back(make_pair('r',str((boost::format("%1% %2% %3%") % bmi % client % name))));
 	return bmi;
 }
 
@@ -260,28 +281,40 @@ void Replica::create(const string & name, const string & initialState) {
 		error.message = string("Machine ") + name + (" already exists");
 		throw error;
 	}
-	DEBUG("RM" << id << " creating " << name);
+	DEBUG("RM " << id << " creating " << name);
 	queueLen++;
 	memUtilization++;
  	machines.insert(make_pair(name, factory.make(initialState)));
 	queueLen--;
 
+	// Initialize the queue
+	requestQueue[name];// = vector< pair<char,string> >;
+
 	if(leader == id){
-		/*for(int i=0; i< (*replicas).numReplicas(); i++){
+		for(int i=0; i< (*replicas).numReplicas(); i++){
 			if(i != id){
 				try{
 					(*replicas)[i].create(name, initialState);
 				}catch(ReplicaError){}
 			}
-		}*/
-		createReplicas(name, initialState);
-		reshuffleReplicas(name, initialState);
+		}
 	}
 }
 
 void Replica::apply(string & result, const string & name, const string& operation) {
 	checkExists(name);
-	DEBUG("RM" << id << " applying " << name);
+	// Enqueue the write
+	pair<char,string> p = make_pair('w',str((boost::format("%1%") % operation)));
+	requestQueue[name].push_back(p);
+	DEBUG("Blocking until my request is at the head of queue...");
+	while(true){
+		if(requestQueue[name][0] == p){
+			break;
+		}
+		boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+	}
+
+	DEBUG("RM " << id << " applying " << name);
 	queueLen++;
 	bwUtilization++;
 	result = machines[name]->apply(operation);
@@ -297,24 +330,45 @@ void Replica::apply(string & result, const string & name, const string& operatio
 			}
 		}
 	}
+
+	// Dequeue the write
+	requestQueue.erase(requestQueue.begin());
 }
 
-void Replica::getState(string& result, const string &name) {
+void Replica::notifyFinishedReading(int16_t rmid, int16_t client, const string &name) {
+	// Remove it the finished reading from queue.
+	bool foundit = false;
+	for(std::vector<int>::size_type i = 0; i != requestQueue[name].size(); i++) {
+		if(requestQueue[name][i].first == 'r' && requestQueue[name][i].second == str((boost::format("%1% %2% %3%") % rmid % client % name)))
+		{
+			requestQueue[name].erase(requestQueue[name].begin()+i);
+			foundit = true;
+			break;
+		}
+	}
+}
+
+void Replica::getState(string& result, int16_t client, const string &name) {
 	checkExists(name);
-	DEBUG("RM" << id << " getting " << name);
+	DEBUG("RM " << id << " getting " << name);
 	queueLen++;
 	bwUtilization++;
 	result = machines[name]->getState();
 	queueLen--;
+
+	(*replicas)[leader].notifyFinishedReading(id, client, name);
 }
 
 void Replica::remove(const string &name) {
 	checkExists(name);
-	DEBUG("RM" << id << " removing " << name);
+	DEBUG("RM " << id << " removing " << name);
 	queueLen++;
 	memUtilization--;
 	machines.erase(name);
 	queueLen--;
+
+
+	requestQueue.erase(name);
 
 	if(leader == id){
 		for(int i=0; i< (*replicas).numReplicas(); i++){

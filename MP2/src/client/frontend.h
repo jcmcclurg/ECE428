@@ -12,9 +12,9 @@ namespace mp2 {
 class FrontEnd
 {
 private:
-	int id;
 	int leader;
 public:
+	int id;
 	boost::shared_ptr<Replicas> replicas;
 	FrontEnd(boost::shared_ptr<Replicas> replicas, int i);
 	~FrontEnd();

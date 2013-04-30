@@ -32,7 +32,7 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("apply\n");
   }
 
-  void getState(std::string& _return, const std::string& name) {
+  void getState(std::string& _return, const int16_t client, const std::string& name) {
     // Your implementation goes here
     printf("getState\n");
   }
@@ -42,7 +42,7 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("remove\n");
   }
 
-  int16_t prepareGetState(const std::string& name) {
+  int16_t prepareGetState(const int16_t client, const std::string& name) {
     // Your implementation goes here
     printf("prepareGetState\n");
   }
@@ -75,6 +75,11 @@ class ReplicaHandler : virtual public ReplicaIf {
   bool stateExists(const std::string& name) {
     // Your implementation goes here
     printf("stateExists\n");
+  }
+
+  void notifyFinishedReading(const int16_t rmid, const int16_t client, const std::string& name) {
+    // Your implementation goes here
+    printf("notifyFinishedReading\n");
   }
 
   void prepare(Promise& _return, const int32_t n) {

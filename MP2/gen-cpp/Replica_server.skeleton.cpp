@@ -47,6 +47,11 @@ class ReplicaHandler : virtual public ReplicaIf {
     printf("prepareGetState\n");
   }
 
+  void makeCopy(const std::string& name, const int16_t destination) {
+    // Your implementation goes here
+    printf("makeCopy\n");
+  }
+
   int16_t getLeader() {
     // Your implementation goes here
     printf("getLeader\n");

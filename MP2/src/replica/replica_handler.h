@@ -27,6 +27,7 @@ public:
 	virtual void remove(const std::string& name);
 
 	int16_t prepareGetState(int16_t client, const std::string& name);
+	virtual void makeCopy(const std::string& name, int16_t destination);
 	int16_t getLeader(void);
 	int16_t getQueueLen(void);
 	int16_t getBwUtilization(void);

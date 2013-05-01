@@ -27,7 +27,7 @@ public:
 				string result;
 				(*(front->replicas))[leader].apply(result, name, operation);
 				return result;
-			}catch(ReplicaError){}
+			}catch(...){}
 		}
 	}
 
@@ -40,7 +40,7 @@ public:
 				int where = (*(front->replicas))[leader].prepareGetState(front->id,name);
 				(*(front->replicas))[where].getState(result,front->id,name);
 				return result;
-			}catch(ReplicaError e){ DEBUG(e.message); }
+			}catch(...){ }
 		}
 	}
 };
@@ -52,14 +52,10 @@ FrontEnd::FrontEnd(boost::shared_ptr<Replicas> replicas, int i) : replicas(repli
 FrontEnd::~FrontEnd() { }
 
 shared_ptr<StateMachine> FrontEnd::create(const string &name, const string &initialState) {
-//	while(true){
 		findLeader();
-//		try{
-			DEBUG("FE " << id << " creating state machine " << name);
-			(*replicas)[leader].create(name, initialState);
-			return get(name);
-//		}catch(ReplicaError){}
-//	}
+		DEBUG("FE " << id << " creating state machine " << name);
+		(*replicas)[leader].create(name, initialState);
+		return get(name);
 }
 
 shared_ptr<StateMachine> FrontEnd::get(const string &name) {
@@ -75,7 +71,7 @@ int FrontEnd::findLeader(void){
 				leader = (*replicas)[i].getLeader();
 				break;
 			}
-			catch(ReplicaError){
+			catch(...){
 				// Failed node
 			}
 		}
@@ -86,7 +82,7 @@ int FrontEnd::findLeader(void){
 
 	try{
 		leader = (*replicas)[leader].getLeader();
-	}catch(ReplicaError){
+	}catch(...){
 		leader = -1;
 		leader = findLeader();
 	}
@@ -95,11 +91,6 @@ int FrontEnd::findLeader(void){
 }
 
 void FrontEnd::remove(const string &name) {
-	while(true){
-		findLeader();
-		try{
-			(*replicas)[leader].remove(name);
-			return;
-		}catch(ReplicaError){}
-	}
+	findLeader();
+	(*replicas)[leader].remove(name);
 }

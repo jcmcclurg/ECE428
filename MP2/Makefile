@@ -1,5 +1,7 @@
-GTEST_DIR=lib/gtest-1.6.0
-THRIFT_DIR=/usr/local
+# GTEST_DIR=lib/gtest-1.6.0
+# THRIFT_DIR=/usr/local
+GTEST_DIR=/class/ece428/libs/gtest-1.6.0
+THRIFT_DIR=/class/ece428/libs
 THRIFT=$(THRIFT_DIR)/bin/thrift
 CFLAGS=-I./gen-cpp -g 
 CXXFLAGS=-DDEBUGLEVEL=1 -I./src -I./gen-cpp -I$(GTEST_DIR)/include -I$(THRIFT_DIR)/include/thrift \

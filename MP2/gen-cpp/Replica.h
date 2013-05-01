@@ -20,6 +20,7 @@ class ReplicaIf {
   virtual void getState(std::string& _return, const int16_t client, const std::string& name) = 0;
   virtual void remove(const std::string& name) = 0;
   virtual int16_t prepareGetState(const int16_t client, const std::string& name) = 0;
+  virtual void makeCopy(const std::string& name, const int16_t destination) = 0;
   virtual int16_t getLeader() = 0;
   virtual int16_t getQueueLen() = 0;
   virtual int16_t getBwUtilization() = 0;
@@ -75,6 +76,9 @@ class ReplicaNull : virtual public ReplicaIf {
   int16_t prepareGetState(const int16_t /* client */, const std::string& /* name */) {
     int16_t _return = 0;
     return _return;
+  }
+  void makeCopy(const std::string& /* name */, const int16_t /* destination */) {
+    return;
   }
   int16_t getLeader() {
     int16_t _return = 0;
@@ -709,6 +713,103 @@ class Replica_prepareGetState_presult {
   int16_t* success;
 
   _Replica_prepareGetState_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _Replica_makeCopy_args__isset {
+  _Replica_makeCopy_args__isset() : name(false), destination(false) {}
+  bool name;
+  bool destination;
+} _Replica_makeCopy_args__isset;
+
+class Replica_makeCopy_args {
+ public:
+
+  Replica_makeCopy_args() : name(), destination(0) {
+  }
+
+  virtual ~Replica_makeCopy_args() throw() {}
+
+  std::string name;
+  int16_t destination;
+
+  _Replica_makeCopy_args__isset __isset;
+
+  void __set_name(const std::string& val) {
+    name = val;
+  }
+
+  void __set_destination(const int16_t val) {
+    destination = val;
+  }
+
+  bool operator == (const Replica_makeCopy_args & rhs) const
+  {
+    if (!(name == rhs.name))
+      return false;
+    if (!(destination == rhs.destination))
+      return false;
+    return true;
+  }
+  bool operator != (const Replica_makeCopy_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_makeCopy_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_makeCopy_pargs {
+ public:
+
+
+  virtual ~Replica_makeCopy_pargs() throw() {}
+
+  const std::string* name;
+  const int16_t* destination;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_makeCopy_result {
+ public:
+
+  Replica_makeCopy_result() {
+  }
+
+  virtual ~Replica_makeCopy_result() throw() {}
+
+
+  bool operator == (const Replica_makeCopy_result & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const Replica_makeCopy_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Replica_makeCopy_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Replica_makeCopy_presult {
+ public:
+
+
+  virtual ~Replica_makeCopy_presult() throw() {}
+
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -1746,6 +1847,9 @@ class ReplicaClient : virtual public ReplicaIf {
   int16_t prepareGetState(const int16_t client, const std::string& name);
   void send_prepareGetState(const int16_t client, const std::string& name);
   int16_t recv_prepareGetState();
+  void makeCopy(const std::string& name, const int16_t destination);
+  void send_makeCopy(const std::string& name, const int16_t destination);
+  void recv_makeCopy();
   int16_t getLeader();
   void send_getLeader();
   int16_t recv_getLeader();
@@ -1797,6 +1901,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_getState(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_remove(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_prepareGetState(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_makeCopy(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getLeader(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getQueueLen(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getBwUtilization(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -1816,6 +1921,7 @@ class ReplicaProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["getState"] = &ReplicaProcessor::process_getState;
     processMap_["remove"] = &ReplicaProcessor::process_remove;
     processMap_["prepareGetState"] = &ReplicaProcessor::process_prepareGetState;
+    processMap_["makeCopy"] = &ReplicaProcessor::process_makeCopy;
     processMap_["getLeader"] = &ReplicaProcessor::process_getLeader;
     processMap_["getQueueLen"] = &ReplicaProcessor::process_getQueueLen;
     processMap_["getBwUtilization"] = &ReplicaProcessor::process_getBwUtilization;
@@ -1900,6 +2006,15 @@ class ReplicaMultiface : virtual public ReplicaIf {
       ifaces_[i]->prepareGetState(client, name);
     }
     return ifaces_[i]->prepareGetState(client, name);
+  }
+
+  void makeCopy(const std::string& name, const int16_t destination) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->makeCopy(name, destination);
+    }
+    ifaces_[i]->makeCopy(name, destination);
   }
 
   int16_t getLeader() {

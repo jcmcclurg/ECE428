@@ -37,6 +37,7 @@ service Replica {
 
 	// Leader-RM communication
 	// returns the current leader
+	void makeCopy(1: string name, 2: i16 destination),
 	i16 getLeader(),
 	i16 getQueueLen(),
 	i16 getBwUtilization(),

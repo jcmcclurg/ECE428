@@ -150,7 +150,7 @@ void Replica::reshuffleReplicas(const std::string& name, const std::string& val)
 						break;
 					}
 				}
-			}}catch(ReplicaError){}
+			}}catch(...){}
 		}
 	} while(!done);
 }
@@ -176,7 +176,7 @@ void Replica::createReplicas(const std::string& name, const std::string& val){
 				}
 				if(b < bm2){ bmi2 = i; bm2 = b; }
 			}
-			}catch(ReplicaError){}
+			}catch(...){}
 		}
 		if(count < MIN_REPLICAS){
 			//(*replicas)[bm].getState(ret,name);
@@ -194,7 +194,7 @@ int16_t Replica::getLeader(void){
 		try{
 			leader = (*replicas)[leader].getLeader();
 		}
-		catch(ReplicaError){
+		catch(...){
 			startLeaderElection();
 		}
 	}
@@ -209,6 +209,12 @@ int16_t Replica::getBwUtilization(void){
 int16_t Replica::getMemUtilization(void){
 	return memUtilization;
 }
+
+void Replica::makeCopy(const std::string& name, int16_t destination){
+	DEBUG("Copying " << name << " over to RM " << destination);
+	(*replicas)[destination].create(name, machines[name]->getState());
+}
+
 
 int16_t Replica::prepareGetState(int16_t client, const std::string& name){
 	if (id != leader){
@@ -239,16 +245,29 @@ int16_t Replica::prepareGetState(int16_t client, const std::string& name){
 	int bm = INT_MAX;
 	int bmi;
 	bool success = false;
+	vector<int> copyOver;
+
+	int count = 0;
 
 	// Find the replica with the least bandwidth (for load balancing purposes)
 	for(int i=0; i< (*replicas).numReplicas(); i++){
 		try{
-		if((*replicas)[i].stateExists(name)){
-			success = true;
 			int b = (*replicas)[i].getBwUtilization();
-			if(b < bm){ bmi = i; bm = b; }
-		}}
-		catch(ReplicaError){}
+			if((*replicas)[i].stateExists(name)){
+				success = true;
+				count++;
+				if(b < bm){ bmi = i; bm = b; }
+				DEBUG("RM " << i << " has a utilzation of " << b);
+			}
+			// If the guy is alive, but doesn't have this, we'd better copy it over.
+			else{
+				DEBUG("RM " << i << " is missing a copy of " << name << "(utilization of " << b << ")");
+				copyOver.push_back(i);
+			}
+		}
+		catch(...){
+			DEBUG("RM " << i << " is dead");
+		}
 	}
 	if(!success){
 		ReplicaError error;
@@ -256,6 +275,21 @@ int16_t Replica::prepareGetState(int16_t client, const std::string& name){
 		error.name = name;
 		error.message = string("Cannot find machine ") + name;
 		throw error;
+	}
+	DEBUG("Picked RM " << bmi);
+
+	for(int j = 0; j < MIN_REPLICAS-count; j++){
+		// Find the replica with the fewest number of existing replicas (for load balancing purposes)
+		int mm = INT_MAX;
+		int mmi;
+		for(std::vector<int>::size_type i = 0; i != copyOver.size(); i++) {
+			try{
+			int m = (*replicas)[i].getMemUtilization();
+			if(m < mm){ mmi = i; mm = m; }
+			}catch(...){}
+		}
+		DEBUG("Putting a copy of " << name << " on RM " << copyOver[mmi]);
+		(*replicas)[bmi].makeCopy(name,copyOver[mmi]);
 	}
 
 	// Queue the read request.
@@ -268,36 +302,67 @@ bool Replica::stateExists(const std::string& name){
 		checkExists(name);
 		return true;
 	}
-	catch(ReplicaError){
+	catch(...){
 		return false;
 	}
 }
 
 void Replica::create(const string & name, const string & initialState) {
-	if (machines.find(name) != machines.end()) {
-		ReplicaError error;
-		error.type = ErrorType::ALREADY_EXISTS;
-		error.name = name;
-		error.message = string("Machine ") + name + (" already exists");
-		throw error;
-	}
-	DEBUG("RM " << id << " creating " << name);
-	queueLen++;
-	memUtilization++;
- 	machines.insert(make_pair(name, factory.make(initialState)));
-	queueLen--;
-
-	// Initialize the queue
-	requestQueue[name];// = vector< pair<char,string> >;
 
 	if(leader == id){
-		for(int i=0; i< (*replicas).numReplicas(); i++){
-			if(i != id){
+		DEBUG("Leader " << id << " managing creation of " << name);
+		int count = 0;
+		for(int j = 0; j < MIN_REPLICAS-count; j++){
+			// Find the replica with the fewest number of existing replicas (for load balancing purposes)
+			int mm = INT_MAX;
+			int mmi;
+			for(int i=0; i< (*replicas).numReplicas(); i++){
 				try{
-					(*replicas)[i].create(name, initialState);
-				}catch(ReplicaError){}
+				if(!(*replicas)[i].stateExists(name)){
+					int m = (*replicas)[i].getMemUtilization();
+					if(m < mm){ mmi = i; mm = m; }
+				}}
+				catch(...){}
+			}
+			DEBUG("Creating a copy of " << name << " on RM " << mmi);
+			if(mmi == id){
+				DEBUG("RM " << id << " creating " << name);
+				queueLen++;
+				memUtilization++;
+				machines.insert(make_pair(name, factory.make(initialState)));
+				queueLen--;
+
+			}
+			else{
+				(*replicas)[mmi].create(name, initialState);
 			}
 		}
+
+		// Leader throws an exception if the state previously existed anywhere.
+		if (count > 0) {
+			ReplicaError error;
+			error.type = ErrorType::ALREADY_EXISTS;
+			error.name = name;
+			error.message = string("Machine ") + name + (" already exists");
+			throw error;
+		}
+	}
+	else{
+		if (machines.find(name) != machines.end()) {
+			ReplicaError error;
+			error.type = ErrorType::ALREADY_EXISTS;
+			error.name = name;
+			error.message = string("Machine ") + name + (" already exists");
+			throw error;
+		}
+		DEBUG("RM " << id << " creating " << name);
+		queueLen++;
+		memUtilization++;
+		machines.insert(make_pair(name, factory.make(initialState)));
+		queueLen--;
+
+		// Initialize the queue
+		requestQueue[name];// = vector< pair<char,string> >;
 	}
 }
 
@@ -326,7 +391,7 @@ void Replica::apply(string & result, const string & name, const string& operatio
 				try{
 					string rslt;
 					(*replicas)[i].apply(rslt, name, operation);
-				}catch(ReplicaError){}
+				}catch(...){}
 			}
 		}
 	}
@@ -350,7 +415,7 @@ void Replica::notifyFinishedReading(int16_t rmid, int16_t client, const string &
 
 void Replica::getState(string& result, int16_t client, const string &name) {
 	checkExists(name);
-	DEBUG("RM " << id << " getting " << name);
+	DEBUG("RM " << id << " getting " << name << " for " << client);
 	queueLen++;
 	bwUtilization++;
 	result = machines[name]->getState();
@@ -375,7 +440,7 @@ void Replica::remove(const string &name) {
 			if(i != id){
 				try{
 					(*replicas)[i].remove(name);
-				}catch(ReplicaError){}
+				}catch(...){}
 			}
 		}
 	}

@@ -54,8 +54,6 @@ private:
  	void checkExists(const std::string & name) const throw (ReplicaError);
  	// add any private methods and variables you need below. 
 
- 	boost::unordered_set<int> liveReplicas;
-
  	int leader;
 	int queueLen;
 	int bwUtilization;

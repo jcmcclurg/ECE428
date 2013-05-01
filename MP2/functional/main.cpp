@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     DEBUG((*replicas)[1].getLeader());
 	DEBUG((*replicas)[2].getLeader());
 
-	(*replicas)[0].exit();
+	//(*replicas)[0].exit();
 
 	sleep(1);
 

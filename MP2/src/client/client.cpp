@@ -23,12 +23,15 @@ int main(int argc, char **argv) {
 
 		cout << "write s0:" << machine0->apply("new0") << endl;
 		cout << "read s1:" << machine1->getState() << endl;
+		(*replicas)[1].exit();
 		(*replicas)[2].exit();
 
 		cout << "write s1:" << machine0->apply("new1") << endl;
 		cout << "read s0:" << machine0->getState() << endl;
 
-		frontEnd0.remove("s0");
+		shared_ptr<Replicas> replicas2(new Replicas(argc, argv));
+		cout << "read s1:" << machine0->getState() << endl;
+		cout << "read s0:" << machine1->getState() << endl;
 
 	} catch (ReplicaError e) {
 			cerr << e.message << endl;

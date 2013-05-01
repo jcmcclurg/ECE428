@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
 	DEBUG("Initialized replica connector.");
 
 	replicas->serve(replica, myid);
+	DEBUG("Served replica.");
 
 	return 0;
 }

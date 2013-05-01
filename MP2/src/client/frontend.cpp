@@ -84,6 +84,7 @@ int FrontEnd::findLeader(void){
 		leader = (*replicas)[leader].getLeader();
 	}catch(...){
 		leader = -1;
+
 		leader = findLeader();
 	}
 

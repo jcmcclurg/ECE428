@@ -77,7 +77,8 @@ gtest_main.a: gtest-all.o gtest_main.o
 	$(AR) $(ARFLAGS) $@ $^
 
 clean:
-	-rm -f bin/* bin/.pipes/*
+	-rm -f bin/.pipes/*
+	find bin \( ! -name config \) | xargs rm -f
 	find . -name "*.o" | xargs rm -f
 
 .PHONY: depend

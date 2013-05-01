@@ -20,6 +20,7 @@ Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> r
 
 	// any initialization you need goes here
 	DEBUG( "Initialized RM " << myid );
+
 }
 
 int16_t Replica::startLeaderElection(void) {
@@ -38,44 +39,55 @@ int16_t Replica::startLeaderElection(void) {
 	// Ensures proposal numbers are distinct across all replicas.
 	proposalNumber += numReplicas;
 
-	for (int i = 0; i < numReplicas; ++i) {
-		if (i != id) {
-			Promise promise;
-			(*replicas)[i].prepare(promise, proposalNumber);
+	boost::unordered_set<int>::iterator it;
+	for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
+		int i = *it;
 
-			if (promise.success) {
-				promisedCount++;
-				if (promise.acceptedProposalValue > highestAcceptedValue) {
-					highestAcceptedValue = promise.acceptedProposalValue;
-				}
+		Promise promise;
+		(*replicas)[i].prepare(promise, proposalNumber);
+
+		if (promise.success) {
+			DEBUG(
+				boost::format("RM %d has received a promise from RM %d for proposal %d.")
+					% id % i % proposalNumber	
+			);
+
+			promisedCount++;
+			if (promise.acceptedProposalValue > highestAcceptedValue) {
+				highestAcceptedValue = promise.acceptedProposalValue;
 			}
 		}
 	}
 
 	// Have enough Acceptors given me their unbreakable word?
 	if (promisedCount > numReplicas / 2) {
+		DEBUG( "RM " << id << " has received promises from a majority of the quorum.");
+
 		proposalNumber += numReplicas;
 
 		// Send out accept requests to all Acceptors.
 		int acceptedCount = 0;
-		for (int i = 0; i < numReplicas; ++i) {
-			if (i != id) {
-				bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
-				if (accepted) {
-					acceptedCount++;
-				}
+		for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
+			int i = *it;
+			bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
+			if (accepted) {
+				DEBUG(
+					boost::format("RM %d has received an acceptance from RM %d for proposal %d.")
+						% id % i % proposalNumber	
+				);
+				acceptedCount++;
 			}
 		}
 
 		if (acceptedCount > numReplicas / 2) {
+			DEBUG( "RM " << highestAcceptedValue << " has been elected.");
+
 			// Leader elected! 
 			leader = highestAcceptedValue;
 
 			// Everyone else assumes a Learner role now.
-			for (int i = 0; i < numReplicas; ++i) {
-				if (i != id) {
-					(*replicas)[i].inform(leader);
-				}
+			for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
+				(*replicas)[*it].inform(leader);
 			}
 		}
 	}
@@ -104,7 +116,6 @@ bool Replica::accept(const int32_t n, const int32_t value) {
 	electionInProgress = true;
 
 	if (n > highestProposalNumber) {
-		DEBUG("Accepted value" << n << " for the leader election.");
 		acceptedProposalNumber = n;
 		acceptedProposalValue = value; 
 		return true;
@@ -191,10 +202,14 @@ int16_t Replica::getLeader(void){
 	}
 	// Ensure that the leader is still alive.
 	else if(leader != id){
-		try{
+		try {
 			leader = (*replicas)[leader].getLeader();
 		}
-		catch(ReplicaError){
+		catch (apache::thrift::TException &tx) {
+			liveReplicas.erase(leader);
+		    startLeaderElection();
+	  	}
+		catch (ReplicaError) {
 			startLeaderElection();
 		}
 	}

@@ -1,6 +1,7 @@
 #ifndef REPLICA_HANLDER_H
 #define REPLICA_HANLDER_H
 
+#include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -52,6 +53,8 @@ private:
  	// check to see if replica exists and throw a error otherwise
  	void checkExists(const std::string & name) const throw (ReplicaError);
  	// add any private methods and variables you need below. 
+
+ 	boost::unordered_set<int> liveReplicas;
 
  	int leader;
 	int queueLen;

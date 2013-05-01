@@ -19,6 +19,7 @@ Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> r
 		  proposalNumber(myid), acceptedProposalNumber(-1), acceptedProposalValue(-1),
 		  electionInProgress(false) {
 
+
 	// any initialization you need goes here
 	DEBUG( "Initialized RM " << myid );
 }
@@ -54,25 +55,27 @@ int16_t Replica::startLeaderElection(void) {
 	// Ensures proposal numbers are distinct across all replicas.
 	proposalNumber += numReplicas;
 
-	boost::unordered_set<int>::iterator it;
-	//for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
-	for(int i=0; i< (*replicas).numReplicas(); i++){
-//		int i = *it;
-		try{
-		Promise promise;
-		(*replicas)[i].prepare(promise, proposalNumber);
+	for (int i = 0; i < numReplicas; ++i) {
+        if (i == id) {
+            break;
+        }
 
-		if (promise.success) {
-			DEBUG(
-				boost::format("RM %d has received a promise from RM %d for proposal %d.")
-					% id % i % proposalNumber	
-			);
+		try {
+            Promise promise;
+	    	(*replicas)[i].prepare(promise, proposalNumber);
 
-			promisedCount++;
-			if (promise.acceptedProposalValue > highestAcceptedValue) {
-				highestAcceptedValue = promise.acceptedProposalValue;
-			}
-		}}catch(...){}
+	    	if (promise.success) {
+		    	DEBUG(
+			    	boost::format("RM %d has received a promise from RM %d for proposal %d.")
+			    		% id % i % proposalNumber	
+		    	);
+
+		    	promisedCount++;
+		    	if (promise.acceptedProposalValue > highestAcceptedValue) {
+			    	highestAcceptedValue = promise.acceptedProposalValue;
+		    	}
+            }
+        } catch (apache::thrift::TException) {}
 	}
 
 	// Have enough Acceptors given me their unbreakable word?
@@ -83,18 +86,22 @@ int16_t Replica::startLeaderElection(void) {
 
 		// Send out accept requests to all Acceptors.
 		int acceptedCount = 0;
-//		for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
-		for(int i=0; i< (*replicas).numReplicas(); i++){
-//			int i = *it;
-			try{
-			bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
-			if (accepted) {
-				DEBUG(
-					boost::format("RM %d has received an acceptance from RM %d for proposal %d.")
-						% id % i % proposalNumber	
-				);
-				acceptedCount++;
-			}}catch(...){}
+
+		for (int i = 0; i < numReplicas; ++i) {
+            if (i == id) {
+                break;
+            }
+
+            try {
+		        bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
+		    	if (accepted) {
+			    	DEBUG(
+				    	boost::format("RM %d has received an acceptance from RM %d for proposal %d.")
+					    	% id % i % proposalNumber	
+	    			);
+	    			acceptedCount++;
+		    	}
+            } catch (apache::thrift::TException) {}
 		}
 
 		if (acceptedCount > numReplicas / 2) {
@@ -104,18 +111,20 @@ int16_t Replica::startLeaderElection(void) {
 			leader = highestAcceptedValue;
 
 			// Everyone else assumes a Learner role now.
-//			for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
-			for(int i=0; i< (*replicas).numReplicas(); i++){
-				try{
-				(*replicas)[i].inform(leader);
-				}catch(...){}
+    		for (int i = 0; i < numReplicas; ++i) {
+                if (i == id) {
+                    break;
+                }
+
+                try  {
+                    (*replicas)[i].inform(leader);
+                } catch (apache::thrift::TException) {}
 			}
 		}
 	}
 
 	electionInProgress = false;
-
-	return leader;
+    return leader;
 }
 
 void Replica::prepare(Promise& _return, const int32_t n) {
@@ -149,9 +158,14 @@ bool Replica::accept(const int32_t n, const int32_t value) {
 // distinguished Learner who decides if a majority of the Quorum (all the replicas here)
 // has accepted a value, we are guaranteed that this method is only called post-election.
 void Replica::inform(const int32_t value) {
-	electionInProgress = false;
+    DEBUG(
+        boost::format("RM %d has been informed of the new leader RM %d.")
+            % id % value
+    );
 
 	leader = value;
+
+    electionInProgress = false;
 }
 
 void Replica::checkExists(const string &name) const throw (ReplicaError) {

@@ -3,6 +3,10 @@
 #include "frontend.h"
 #include "replica/replicas.h"
 #include "settings.h"
+#include <iostream>
+#include <string>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 
 using namespace mp2;
 using namespace std;
@@ -12,27 +16,28 @@ int main(int argc, char **argv) {
 	shared_ptr<Replicas> replicas(new Replicas(argc, argv));
 
 	FrontEnd frontEnd0(replicas, 0);
-	FrontEnd frontEnd1(replicas, 1);
+//	FrontEnd frontEnd1(replicas, 1);
 
 	try {
+		string str;
+
+		DEBUG("Three replicas are created and writes sent to all three:");
 		shared_ptr<StateMachine> machine0 = frontEnd0.create("s0", "0");
-		shared_ptr<StateMachine> machine1 = frontEnd1.create("s1", "1");
+		DEBUG("write s0:" << machine0->apply("1"));
 
+		DEBUG("\nLoad balancing, reads are satisfied from only one replica:");
 		DEBUG("read s0:" << machine0->getState());
-		cout << "read s1:" << machine1->getState() << endl;
+		DEBUG("read s0:" << machine0->getState());
+		DEBUG("read s0:" << machine0->getState());
+		DEBUG("read s0:" << machine0->getState());
+		DEBUG("read s0:" << machine0->getState());
 
-		cout << "write s0:" << machine0->apply("new0") << endl;
-		cout << "read s1:" << machine1->getState() << endl;
+		DEBUG("\nReads and writes succeed after 1 or 2 failures.");
+		(*replicas)[0].exit();
 		(*replicas)[1].exit();
-		(*replicas)[2].exit();
 
-		cout << "write s1:" << machine0->apply("new1") << endl;
-		cout << "read s0:" << machine0->getState() << endl;
-
-		shared_ptr<Replicas> replicas2(new Replicas(argc, argv));
-		cout << "read s1:" << machine0->getState() << endl;
-		cout << "read s0:" << machine1->getState() << endl;
-
+		DEBUG("read s0:" << machine0->apply("2"));
+		DEBUG("Please restart replicas 0 and 1.");
 	} catch (ReplicaError e) {
 			cerr << e.message << endl;
 			return 1;

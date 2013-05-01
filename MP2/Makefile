@@ -23,12 +23,16 @@ RPCOBJS:=$(patsubst %.cpp,%.o,$(RPCSOURCES))
 LDFLAGS=-L$(THRIFT_DIR)/lib -lpthread -lthrift -lboost_program_options-mt -lboost_filesystem-mt -lboost_system-mt -lboost_thread-mt
 
 .PHONY: all test clean
-all: replica client
+all: replica client client2 client3
 
 replica: $(REPLICAOBJS) src/replica/replica_main.o $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
  
 client: src/client/client.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+client2: src/client/client2.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
+client3: src/client/client3.o src/client/frontend.o src/replica/replicas.o $(RPCOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o bin/$@
  
 replicas_unittest: test/replicas_unittest.o $(REPLICAOBJS) $(RPCOBJS) gtest_main.a
@@ -79,9 +83,9 @@ gtest_main.a: gtest-all.o gtest_main.o
 	$(AR) $(ARFLAGS) $@ $^
 
 clean:
-	-rm -f bin/.pipes/*
-	find bin \( ! -name config \) | xargs rm -f
-	find . -name "*.o" | xargs rm -f
+	-rm .pipes/*
+	-rm bin/*
+	find . -name "*.o" | xargs rm
 
 .PHONY: depend
 depend: .depend

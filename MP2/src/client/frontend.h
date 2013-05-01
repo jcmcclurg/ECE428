@@ -3,7 +3,8 @@
 
 #include <string>
 #include <boost/shared_ptr.hpp>
-
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 #include "model/statemachine.h"
 #include "replica/replicas.h"
 
@@ -13,6 +14,7 @@ class FrontEnd
 {
 private:
 	int leader;
+	bool findingLeader;
 public:
 	int id;
 	boost::shared_ptr<Replicas> replicas;

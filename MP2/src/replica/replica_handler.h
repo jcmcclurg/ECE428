@@ -4,6 +4,10 @@
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
+//#include <boost/signals2/mutex.hpp>
+//#include <boost/thread/condition_variable.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "Replica.h"
 
@@ -55,12 +59,16 @@ private:
  	void checkExists(const std::string & name) const throw (ReplicaError);
  	// add any private methods and variables you need below. 
 
- 	boost::unordered_set<int> liveReplicas;
+// 	boost::unordered_set<int> liveReplicas;
 
  	int leader;
 	int queueLen;
 	int bwUtilization;
 	int memUtilization;
+
+//	boost::mutex findLeaderLock;
+//	boost::mutex queueLock;
+//	boost::condition_variable queueCondition;
 
 	std::map< std::string, std::vector< std::pair<char,std::string> > > requestQueue;
 
@@ -70,9 +78,6 @@ private:
 	int acceptedProposalNumber;
 	int acceptedProposalValue;
 	bool electionInProgress;
-
-	void createReplicas(const std::string& name, const std::string& val);
-	void reshuffleReplicas(const std::string& name, const std::string& val);
 };
 
 } // namespace mp2 

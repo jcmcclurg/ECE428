@@ -18,9 +18,14 @@ Replica::Replica(int myid, StateMachineFactory & factory, shared_ptr<Replicas> r
 		  proposalNumber(myid), acceptedProposalNumber(-1), acceptedProposalValue(-1),
 		  electionInProgress(false) {
 
+    for (int i = 0; i < replicas->numReplicas(); ++i) {
+        if (id != i) {
+            liveReplicas.insert(i);
+        }
+    }
+
 	// any initialization you need goes here
 	DEBUG( "Initialized RM " << myid );
-
 }
 
 int16_t Replica::startLeaderElection(void) {
@@ -43,7 +48,9 @@ int16_t Replica::startLeaderElection(void) {
 	for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
 		int i = *it;
 
-		Promise promise;
+		try {
+       
+        Promise promise;
 		(*replicas)[i].prepare(promise, proposalNumber);
 
 		if (promise.success) {
@@ -57,6 +64,10 @@ int16_t Replica::startLeaderElection(void) {
 				highestAcceptedValue = promise.acceptedProposalValue;
 			}
 		}
+
+        } catch (apache::thrift::TException) {
+            liveReplicas.erase(it);
+        }
 	}
 
 	// Have enough Acceptors given me their unbreakable word?
@@ -68,7 +79,8 @@ int16_t Replica::startLeaderElection(void) {
 		// Send out accept requests to all Acceptors.
 		int acceptedCount = 0;
 		for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
-			int i = *it;
+			try {
+            int i = *it;
 			bool accepted = (*replicas)[i].accept(proposalNumber, highestAcceptedValue);
 			if (accepted) {
 				DEBUG(
@@ -77,6 +89,9 @@ int16_t Replica::startLeaderElection(void) {
 				);
 				acceptedCount++;
 			}
+            } catch(apache::thrift::TException) {
+                liveReplicas.erase(it);
+            }
 		}
 
 		if (acceptedCount > numReplicas / 2) {
@@ -87,7 +102,11 @@ int16_t Replica::startLeaderElection(void) {
 
 			// Everyone else assumes a Learner role now.
 			for (it = liveReplicas.begin(); it != liveReplicas.end(); ++it) {
-				(*replicas)[*it].inform(leader);
+				try {
+                (*replicas)[*it].inform(leader);
+                } catch (apache::thrift::TException) {
+                   liveReplicas.erase(*it);
+                }
 			}
 		}
 	}
@@ -128,6 +147,11 @@ bool Replica::accept(const int32_t n, const int32_t value) {
 // has accepted a value, we are guaranteed that this method is only called post-election.
 void Replica::inform(const int32_t value) {
 	electionInProgress = false;
+
+    DEBUG(
+        boost::format("RM %d has been informed of the new leader RM %d.")
+            % id % value
+    );
 
 	leader = value;
 }
